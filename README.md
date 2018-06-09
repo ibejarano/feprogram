@@ -1,22 +1,23 @@
 # README #
 
-This README would normally document whatever steps are necessary to get your application up and running.
-
-### What is this repository for? ###
+### Implementado ###
 
 * Quick summary
-Repository of imef's work practice
+Repository of imef's work practice, not application defined yet.
 * Version
-1
+0.1
 * [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
 
-### How do I get set up? ###
+### How does this work? ###
 
 * Summary of set up
 * Configuration
 * Dependencies
+Numpy
 * Database configuration
+input: 2x2 elements mesh
 * How to run tests
+in elements.py a little mesh is defined
 * Deployment instructions
 
 ### Contribution guidelines ###

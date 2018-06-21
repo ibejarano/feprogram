@@ -12,7 +12,7 @@ def Hrs(r,s):
     funHrs = np.matrix([h1,h2,h3,h4])
     return funHrs
 
-def DHrs(r,s):
+def dHrs(r,s):
     dhr1 = 0.25*(1+s)
     dhr2 = -0.25*(1+s)
     dhr3 = -0.25*(1-s)
@@ -26,10 +26,32 @@ def DHrs(r,s):
     funDHrs[1] = [dhs1,dhs2,dhs3,dhs4]
     return funDHrs
 
-def Jacob(r,s):
+def funJ(r,s,Coords):
     #FALTA DEFINIR LAS COORD, SEGURAMENTE SERAN EN PUNTOS DE GAUSS
-    return DHrs(r,s)*coords
+    return dHrs(r,s)*Coords
 
+def funB(r,s,J):
+    B = np.matrix(np.zeros((3,8)))
+    Jinv = np.linalg.inv(J)
+    DH = (dHrs(r,s).T * Jinv).T
+    for i in range(2):
+        B[i,i::2] = DH[i]
+        B[1-i::2,::2] = DH[i]  
+    return B
+
+def Q4(NodesVec):
+    Coords = np.matrix(NodesVec)
+    gpoints = [-0.5773, 0.5773]
+    J = np.matrix(np.zeros((2,2)))
+    Ke = np.matrix(np.zeros((8,8)))
+    for gpr in gpoints:
+        for gps in gpoints:
+            J = funJ(gpr,gps,Coords)
+            B = funB(gpr,gps,J)
+            detJ =  np.linalg.det(J)
+            Kel += B.T * B
+            print(Kel)
+    return J
 
 #LISTA PARA TESTEOS DE MATRICES, EL ELEMENTO 1 ESTA DISTORSIONADO
 matcon = [[0,1,4,3],[1,2,5,4],[3,4,7,6],[4,5,8,7]]
@@ -42,4 +64,6 @@ for elem in matcon:
     for node in elem:
         nodeloc.append(coordenadas[node])
     lista.append(elementQ4(nodeloc))
-    
+
+coordstest = [[3,2],[-3,2],[-3,-2],[3,-2]]
+test = Q4(coordstest)

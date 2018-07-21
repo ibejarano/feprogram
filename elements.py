@@ -1,8 +1,41 @@
 import numpy as np
+import scipy.sparse as sp
+import sys
+import logging
+from gmshtools import readGmshFile
 
-class elementQ4:
-    def __init__(self,num, nodes):
-        self.num = num
+def Constructor(entity,inpGmsh,cNodes):
+    '''
+    entity: Entidad para extraer datos de malla, puede ser $Nodes o $Elements
+    inpGmsh: Input archivo .gmsh para extraer datos
+    cNodes: Lista con Nodos objetos
+    nEntity: Cantidad de entidades encontradas
+    entityList: Lista con entidades
+    '''
+    nEntity , entityFile = readGmshFile(entity,inpGmsh)
+    entityList = []
+    for items in range(nEntity):
+        line = entityFile.readline()
+        intLine = tuple(map(int,line.split()))
+        if entity == '$Nodes':
+            entityList.append(Node2D(intLine[1:4]))
+        else:
+            objNodes = nodesAsign(intLine[5:9],cNodes)
+            entityList.append(ElemQ4(objNodes))
+    return nEntity  , entityList
+
+def nodesAsign(tNodes,coordNodes):
+    '''
+    tNodes: Tupla con los nodos enteros
+    tobj: Tupla con los objetos nodos
+    '''
+    objNod = []
+    for i in tNodes:
+        objNod.append(coordNodes[i-1])
+    return objNod
+
+class ElemQ4:
+    def __init__(self,nodes):
         self.nloc = nodes
 
     def getpos(self):
@@ -48,13 +81,15 @@ class elementQ4:
                 Ke += B.T * B * detJ
         return Ke
 
-class node:
-    def __init__(self,num,coords):
-        self.ng = num
+class Node2D:
+    nglob = 1
+    def __init__(self,coords):
         self.x = coords[0]
         self.y = coords[1]
         self.DIR = False
         self.NEU = False
+        self.nglob = self.nglob
+        Node2D.nglob += 1
     def setDIR(self):
         self.DIR = True
     def setNEU(self):
@@ -69,22 +104,25 @@ def funHrs(r,s):
     hrs = np.matrix([h1,h2,h3,h4])
     return hrs
 
-#LISTA PARA TESTEOS DE MATRICES, EL ELEMENTO 1 ESTA DISTORSIONADO
-matcon = [[0,1,4,3],[1,2,5,4],[3,4,7,6],[4,5,8,7]]
-coordenadas = [[3,2],[1,2],[0,2],[2,1],[1,1],[0,1],[2,0],[1,0],[0,0]]
+def Assemble(elem,Ke,K):
+    '''
+    elem: Objeto elemento
+    Ke: Matriz de rigidez local a ensamblar en global
+    K: Matriz global
+    '''
+    for i in range(4):
+        ni = elem.nloc[i].nglob
+        for j in range(4):
+            nj = elem.nloc[j].nglob
+            K[ni-1,nj-1] += Ke[i,j]
+    return K
 
-nodelist = []
-for numglobal , coord in enumerate(coordenadas):
-    nodelist.append(node(numglobal, coord))
 
-#CONSTRUCTOR DE LISTA CON OBJETOS ELEMENTOS EN CADA UNO
-elemlist = []
-for num,elem in enumerate(matcon):
-    locallist = []
-    for node in elem:
-        locallist.append(nodelist[node])
-    elemlist.append(elementQ4(num,locallist))
 
-#coordstest = [[3,2],[-3,2],[-3,-2],[3,-2]]
-#test = Q4(coordstest)
-print(elemlist[1].getKe())
+fileGmsh = sys.argv[1]
+print(fileGmsh)
+n, coord = Constructor('$Nodes',fileGmsh,None)
+nelem, conect = Constructor('$Elements',fileGmsh,coord)
+
+#Inicio de matriz global
+K = sp.lil_matrix((n,n))

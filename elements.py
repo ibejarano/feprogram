@@ -1,9 +1,7 @@
-import numpy as np
-import scipy.sparse as sp
-import sys
-import logging
+#!/usr/bin/python3.6
+
 from gmshtools import readGmshFile
-from scipy.sparse.linalg import spsolve
+import numpy as np
 
 def Constructor(entity,inpGmsh,cNodes):
     '''
@@ -17,17 +15,21 @@ def Constructor(entity,inpGmsh,cNodes):
     entityList = []
     for items in range(nEntity):
         line = entityFile.readline()
-        intLine = tuple(map(int,line.split()))
         if entity == '$Nodes':
+            intLine = tuple(map(float,line.split()))
             entityList.append(Node2D(intLine[1:4]))
-        elif len(intLine) == 9:
-            objNodes = nodesAsign(intLine[5:9],cNodes)
-            entityList.append(ElemQ4(objNodes))
         else:
-            physGroup = intLine[3]
-            intNode = intLine[6]
-            objNode = cNodes[intNode-1]
-            objNode.setBG(physGroup)
+            intLine = tuple(map(int,line.split()))
+            if len(intLine) == 9:
+                objNodes = nodesAsign(intLine[5:9],cNodes)
+                entityList.append(ElemQ4(objNodes))
+            else:
+                physGroup = intLine[3]
+                for nod in intLine[5:7]:
+                    intNode = nod
+                    objNode = cNodes[intNode-1]
+                    objNode.setBG(physGroup)
+                nEntity -=1
     return nEntity  , entityList
 
 def nodesAsign(tNodes,coordNodes):
@@ -40,25 +42,35 @@ def nodesAsign(tNodes,coordNodes):
         objNod.append(coordNodes[i-1])
     return objNod
 
-
-
 class ElemQ4:
     def __init__(self,nodes):
         self.nloc = nodes
 
-    def getpos(self):
-        auxlist = []
-        for i in range(4):
-            auxlist.append([self.nloc[i].x,self.nloc[i].y])
-        return np.matrix(auxlist)
+    def localNodes(self):
+        initList = []
+        for i in range(len(self.nloc)):
+            initList.append(self.nloc[i].nglob)
+        return initList
+
+    def Cmat(self):
+        nu = 0.3
+        E = 200
+        mat = np.zeros((3,3))
+        auxlist = [[1,nu,0],[nu,1,0],[0,0,(1-nu)*0.5]]
+        ind = 0
+        for i in auxlist:
+            mat[ind] = i
+            ind +=1
+        const = E / (1- nu**2)
+        return mat*const
 
     def fundHrs(self,r,s):
-        hr=[0.25*y*x*(1+x*s) for x in [1,-1] for y in [1,-1]]
-        hs=[0.25*x*(1+y*x*s) for x in [1,-1] for y in [1,-1]]
+        hr=[1+s , -1-s , -1 +s ,1-s]
+        hs=[1+r,1-r , -1 +r , -1 -r]
         dhrs = np.matrix(np.zeros((2,4)))
         dhrs[0] = hr
         dhrs[1] = hs
-        return dhrs
+        return dhrs*0.25
 
     def funB(self,dHrs,J):
         B = np.matrix(np.zeros((3,8)))
@@ -66,22 +78,51 @@ class ElemQ4:
         DH = Jinv * dHrs
         for i in range(2):
             B[i,i::2] = DH[i]
-            B[1-i::2,::2] = DH[i]
+            B[2,i::2] = DH[i-1]
         return B
 
-    def getKe(self):
-        Pos = self.getpos()
+    def getpos(self):
+        auxlist = []
+        for i in range(4):
+            auxlist.append([self.nloc[i].x,self.nloc[i].y])
+        return np.matrix(auxlist)   
+
+    def buildMatrix(self):
         gpoints = [-0.5773, 0.5773]
-        J = np.matrix(np.zeros((2,2)))
-        Ke = np.matrix(np.zeros((8,8)))
+        He = []
         for gpr in gpoints:
             for gps in gpoints:
                 dHrs = self.fundHrs(gpr,gps)
-                J = dHrs*Pos
-                B = self.funB(dHrs,J)
-                detJ = np.linalg.det(J)
-                Ke += B.T * B * detJ
+                He.append(dHrs)
+        return He
+
+    def getKe(self,He,C):
+        Pos = self.getpos()
+        J = np.matrix(np.zeros((2,2)))
+        Ke = np.matrix(np.zeros((8,8)))
+        Be = np.matrix(np.zeros((3,8)))
+        for i in range(4):
+            J = He[i]*Pos
+            detJ = np.linalg.det(J)
+            B = self.funB(He[i],J)
+            Ke += B.T * C * B * detJ *10
+            Be += C * B * detJ *10
+        self.Bstress = Be
         return Ke
+
+    def Stress(self,U,C,He):
+        Pos = self.getpos()
+        J = np.matrix(np.zeros((2,2)))
+        Stre = np.matrix(np.zeros((3,1)))
+        Be = np.matrix(np.zeros((3,8)))
+        Hoo = self.fundHrs(0,0)
+        J = Hoo*Pos
+        B = self.funB(Hoo,J)
+        Stre =  C * B *U *10
+        return Stre.T
+
+    def StressPost(self,Bel):
+        self.CB = Bel
 
 class Node2D:
     nglob = 1
@@ -94,13 +135,19 @@ class Node2D:
         self.nglob = self.nglob
         self.BG = False
         Node2D.nglob += 1
+        self.stress = [0,0,0]
+        self.markStress = 1
 
     def setBG(self, group):
         self.BG = True
         self.bcGroup = group
 
-    def setNEU(self):
+    def setNEUx(self,bc):
         self.NEU = True
+        self.xForce = bc
+
+    def setNEUy(self,bc):
+        self.yForce = bc
 
     def setDIRxValue(self,value):
         self.DIRx = True
@@ -114,6 +161,11 @@ class Node2D:
         self.xValue = xValue
         self.yValue = yValue
 
+    def storeStress(self,stressVector):
+        for i in range(3):
+            self.stress[i] = (stressVector[0,i] + self.stress[i]) / (self.markStress+1) - self.stress[i]/(self.markStress)
+        self.markStress += 1
+
     def physGrouptoValue(self,bclist):
         '''
         Pasar los numeros del phys group a un valor
@@ -122,11 +174,16 @@ class Node2D:
         pairValue = bclist[group]
         aux = 0
         for bc in pairValue:
-            if bc != None:
-                if aux == 0:
+            if group == 0:
+                if aux ==0:
                     self.setDIRxValue(bc)
                 else:
                     self.setDIRyValue(bc)
+            else:
+                if aux ==0:
+                    self.setNEUx(bc)                  
+                else:
+                    self.setNEUy(bc)
             aux += 1
 
 def funHrs(r,s):
@@ -149,47 +206,25 @@ def Assemble(elem,Ke,K,brhs):
         ni = elem.nloc[i].nglob-1
         gl = ni*2
         if elem.nloc[i].DIRx and elem.nloc[i].DIRy :
-            K[gl,gl:gl+2] = 1
-            brhs[gl:gl+2] = elem.nloc[i].xValue
-            brhs[gl+1] = elem.nloc[i].yValue
-            test = [elem.nloc[i].xValue , elem.nloc[i].yValue]
-            print(K[gl,:])
-        elif elem.nloc[i].DIRx:
             K[gl,gl] = 1
-            brhs[gl] = elem.nloc[i].xValue
-        elif elem.nloc[i].DIRy:
             K[gl+1,gl+1] = 1
+            brhs[gl] = elem.nloc[i].xValue
             brhs[gl+1] = elem.nloc[i].yValue
         else :
+            if elem.nloc[i].NEU:
+                brhs[gl] = elem.nloc[i].xForce
+                brhs[gl+1] = elem.nloc[i].yForce               
             for j in range(4):
-                nj = elem.nloc[j].nglob
+                nj = elem.nloc[j].nglob-1
                 glj= nj*2
-                K[gl,glj:glj+2] += Ke[i*2,j*2:j*2+1]
+                K[gl:gl+2,glj:glj+2] += Ke[i*2:i*2+2,j*2:j*2+2]
     return K , brhs
 
-fileGmsh = sys.argv[1]
-print(fileGmsh)
-n, coord = Constructor('$Nodes',fileGmsh,None)
-nelem, conect = Constructor('$Elements',fileGmsh,coord)
-
-#Inicio de matriz global
-K = sp.lil_matrix((n*2,n*2))
-brhs = sp.lil_matrix((n*2,1))
-#Formato de cond de borde
-bcList = [[0,0],[1,None],[0,0],[None,1]]
-
-for nodin in coord:
-    if nodin.BG:
-        nodin.physGrouptoValue(bcList)
-
-for elemtest in conect:
-    Ke = elemtest.getKe()
-    K , bhrs = Assemble(elemtest, Ke , K , brhs)
-
-print(K)
-
-#K = K.tocsc
-#brhs = brhs.tocsc
-
-#U = spsolve(K,brhs)
-#print(U)
+def Ulocal(Umat,listaNodos):
+    Uaux = np.matrix(np.zeros((8,1)))
+    auxlist = []
+    for count, nod in enumerate(listaNodos):
+        #Uaux[count:count+2] = Umat[nod.nglob:nod.nglob+2,0]
+        auxlist.append(Umat[nod.nglob:nod.nglob+2])
+    Uaux = np.matrix(auxlist).reshape(8,1)
+    return Uaux

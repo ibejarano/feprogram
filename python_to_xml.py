@@ -1,7 +1,7 @@
 def writeXML(coords,conect,nodedata,elemdata , nameFile,nodeStress):
     '''
-    coords : Array with coordinates z,y
-    coenct : Array with elements nodes
+    coords : Array with coordinates x & y (i have to add 0.0 below)
+    conect : Array with elements nodes
     nodedata: Array with node displacements
     elemdata: Array with Stressxx Stressyy, Shearxy
     '''
@@ -12,27 +12,27 @@ def writeXML(coords,conect,nodedata,elemdata , nameFile,nodeStress):
     fOut.write( '<?xml version="1.0"?>\n<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">\n')
     fOut.write(' <UnstructuredGrid>\n')
     fOut.write('  <Piece NumberOfPoints="{}" NumberOfCells="{}">\n'.format(nnode,nelem))
-    #ESCRIBO LOS DATOS DE LOS NODOS
+    #ESCRIBO LOS DATOS DE LOS NODOS STRESS
     fOut.write('   <PointData Vectors="Tensiones">\n')
-    fOut.write('    <DataArray NumberOfComponents="2" type="Float32" Name="Tensiones" format="ascii">\n    ')
+    fOut.write('    <DataArray NumberOfComponents="3" type="Float32" Name="Tensiones" format="ascii">\n    ')
     for data in nodeStress:
-        fOut.write(' ' + str(data[0]) + ' ' + str(data[1]))
+        fOut.write(' ' + str(data[0]) + ' ' + str(data[1])+ ' '+ str(data[2]))
     fOut.write('\n    </DataArray>')
     fOut.write('\n   </PointData>\n')
-    #ESCRIBO LOS DATOS DE LOS NODOS STRESS
+    #ESCRIBO LOS DATOS DE LOS NODOS DISPLACEMENTS
     # fOut.write('   <PointData Vectors="Displacement">\n')
-    # fOut.write('    <DataArray NumberOfComponents="2" type="Float32" Name="Displacement" format="ascii">\n    ')
+    # fOut.write('    <DataArray NumberOfComponents="3" type="Float32" Name="Displacement" format="ascii">\n    ')
     # for data in nodedata:
     #     fOut.write(' ' + str(data))
     # fOut.write('\n    </DataArray>')
     # fOut.write('\n   </PointData>\n')
     #DATA ELEMENTOS
-    # fOut.write('   <CellData Tensors="Stress">\n')
-    # fOut.write('    <DataArray NumberOfComponents="3" type="Float32" Name="Stress" format="ascii">\n    ')
-    # for data in elemdata:
-    #     fOut.write(' ' + str(data[0,0]) + ' ' + str(data[0,1]) + ' '+str(data[0,2]))
-    # fOut.write('\n    </DataArray>')
-    # fOut.write('\n   </CellData>\n')
+    fOut.write('   <CellData Tensors="Stress">\n')
+    fOut.write('    <DataArray NumberOfComponents="3" type="Float32" Name="Stress" format="ascii">\n    ')
+    for data in elemdata:
+        fOut.write(' ' + str(data[0,0]) + ' ' + str(data[0,1]) + ' '+str(data[0,2]))
+    fOut.write('\n    </DataArray>')
+    fOut.write('\n   </CellData>\n')
     #DEFINO NODOS
     fOut.write('   <Points>\n')
     fOut.write('    <DataArray NumberOfComponents="3" type="Float32"  format="ascii">\n    ')
@@ -66,4 +66,4 @@ def writeXML(coords,conect,nodedata,elemdata , nameFile,nodeStress):
 
     fOut.close()
 if __name__ == '__main__':
-    writeXML(1,1,1,1)
+    writeXML(1,1,1,1,0)

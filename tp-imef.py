@@ -10,6 +10,17 @@ from elements import Node2D , ElemQ4 , Assemble , Constructor ,Ulocal
 from datetime import datetime
 from python_to_xml import writeXML
 
+def storeValuesToNodes(nodeArray,values):
+        '''
+        Solo almacena los desplazamientos calculados en los nodos
+        '''
+        nNodos = len(nodeArray)
+        values = U.reshape(nNodos,2)
+        for i in range(nNodos):
+                nodeArray[i].storeCalcValue(values[i,0],values[i,1])
+        return None
+
+
 
 t1 = datetime.now()
 logging.basicConfig(level='INFO')
@@ -24,24 +35,27 @@ C = conect[0].Cmat()
 #Inicio de matriz global
 K = sp.lil_matrix((nNodos*2,nNodos*2))
 brhs = sp.lil_matrix((nNodos*2,1))
+
 #Formato de cond de borde
-bcList = [[0,0],[100,0]]
+bcList = [[0,0],[10,0]]
 
 for nodin in coord:
     if nodin.BG:
         nodin.physGrouptoValue(bcList)
 
-# # TestH = conect[0].fundHrs(-1,1)
-
-for elemtest in conect:
-    Ke = elemtest.getKe(He,C)
-    K , brhs = Assemble(elemtest, Ke , K , brhs)
+for elem in conect:
+    Ke = elem.getKe(He,C)
+    K , brhs = Assemble(elem, Ke , K , brhs)
     # elemtest.StressPost(CBe)
 
 K = K.tocsc()
 brhs = brhs.tocsc()
 
 U = spsolve(K,brhs)
+
+storeValuesToNodes(coord,U)
+
+    
 
 Stress = np.matrix(np.zeros((nelem,3)))
 
@@ -65,7 +79,7 @@ for i in range(nNodos):
 for i in range(nelem):
     outConect[i] = [conect[i].nloc[k].nglob -1  for k in range(4)]
 
-writeXML(outCoords, outConect ,U,Stress , sys.argv[1],outNodesStress)
+writeXML(outCoords, outConect ,U,Stress, sys.argv[1],outNodesStress)
 
 
 # t2 = datetime.now()

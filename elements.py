@@ -106,7 +106,7 @@ class ElemQ4:
             detJ = np.linalg.det(J)
             B = self.funB(He[i],J)
             Ke += B.T * C * B * detJ *10
-            Be += C * B * detJ *10
+            Be += B * detJ *10
         self.Bstress = Be
         return Ke
 
@@ -123,6 +123,16 @@ class ElemQ4:
 
     def StressPost(self,Bel):
         self.CB = Bel
+
+    def calcBaricenter(xList):
+        xn = len(xList)
+        baricenter = 0
+        for x in xList:
+            baricenter += x/xn
+        return baricenter
+
+    # def computeStress(self):
+        
 
 class Node2D:
     nglob = 1

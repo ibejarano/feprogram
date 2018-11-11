@@ -12,10 +12,12 @@ Repository of imef's work practice, not application defined yet.
 
 * Summary of set up
 * Configuration
+- None
 * Dependencies
 Numpy
+Scipy
 * Database configuration
-input: 2x2 elements mesh
+Gmsh mesh generated
 * How to run tests
 in elements.py a little mesh is defined
 * Deployment instructions

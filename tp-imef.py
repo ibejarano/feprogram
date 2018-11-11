@@ -20,7 +20,26 @@ def storeValuesToNodes(nodeArray,values):
                 nodeArray[i].storeCalcValue(values[i,0],values[i,1])
         return None
 
+def computeDomainStress(elemMat):
+        nelem = len(elemMat)
+        outConect = np.zeros((nelem,4))
+        Stress = np.matrix(np.zeros((nelem,3)))
 
+        for elemRow , elem in enumerate(elemMat):
+                outConect[elemRow] = [elem.nloc[k].nglob -1  for k in range(4)]
+                elemStress = elem.computeStress(C).T
+                Stress[elemRow] = elemStress
+                elemMat[elemRow].elemStressToNodes(elemStress)
+        return outConect
+
+
+def createNodeData(nodeMat):
+        outCoords = np.zeros((nNodos,3))
+        outNodesStress = np.zeros((nNodos,3))
+        for nodeRow, node in enumerate(nodeMat):
+                outCoords[nodeRow] = [node.x , node.y , 0.0]
+                outNodesStress[nodeRow] = node.stress
+        return outCoords , outNodesStress
 
 t1 = datetime.now()
 logging.basicConfig(level='INFO')
@@ -36,7 +55,7 @@ K = sp.lil_matrix((nNodos*2,nNodos*2))
 brhs = sp.lil_matrix((nNodos*2,1))
 
 #Formato de cond de borde
-bcList = [[0,0],[100,0]]
+bcList = [[0,0],[400,200]]
 
 for nodin in coord:
     if nodin.BG:
@@ -54,23 +73,11 @@ U = spsolve(K,brhs)
 
 storeValuesToNodes(coord,U)
 
-Stress = np.matrix(np.zeros((nelem,3)))
-nelem = len(conect)
-outCoords = np.zeros((nNodos,3))
-outNodesStress = np.zeros((nNodos,3))
-outConect = np.zeros((nelem,4))
+conectivity = computeDomainStress(conect)
 
-for i in range(nelem):
-    outConect[i] = [conect[i].nloc[k].nglob -1  for k in range(4)]
-    elemStress = conect[i].computeStress(C).T
-    Stress[i] = elemStress
-    conect[i].elemStressToNodes(elemStress)
-    
-for i in range(nNodos):
-    outCoords[i] = [coord[i].x , coord[i].y , 0.0]
-    outNodesStress[i] = coord[i].stress
+nodeCoordinates , nodeStress = createNodeData(coord)
 
-writeXML(outCoords, outConect ,U,Stress, sys.argv[1],outNodesStress)
+writeXML(nodeCoordinates, conectivity , U, sys.argv[1], nodeStress)
 
 
 # t2 = datetime.now()

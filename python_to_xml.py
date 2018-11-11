@@ -1,12 +1,12 @@
-def writeXML(coords,conect,nodedata,elemdata , nameFile,nodeStress):
+def writeXML(coords, conect, nodedata, nameFile, nodeStress):
     '''
     coords : Array with coordinates x & y (i have to add 0.0 below)
     conect : Array with elements nodes
     nodedata: Array with node displacements
-    elemdata: Array with Stressxx Stressyy, Shearxy
+    nodeStress: Array with stress in Nodes
     '''
     nnode = coords.shape[0]
-    nelem = elemdata.shape[0]
+    nelem = conect.shape[0]
     fOut = open(nameFile.split(".")[0]+".vtu","w")
     #HEADER
     fOut.write( '<?xml version="1.0"?>\n<VTKFile type="UnstructuredGrid" version="0.1" byte_order="LittleEndian">\n')
@@ -27,12 +27,12 @@ def writeXML(coords,conect,nodedata,elemdata , nameFile,nodeStress):
     # fOut.write('\n    </DataArray>')
     # fOut.write('\n   </PointData>\n')
     #DATA ELEMENTOS
-    fOut.write('   <CellData Tensors="Stress">\n')
-    fOut.write('    <DataArray NumberOfComponents="3" type="Float32" Name="Stress" format="ascii">\n    ')
-    for data in elemdata:
-        fOut.write(' ' + str(data[0,0]) + ' ' + str(data[0,1]) + ' '+str(data[0,2]))
-    fOut.write('\n    </DataArray>')
-    fOut.write('\n   </CellData>\n')
+    # fOut.write('   <CellData Tensors="Stress">\n')
+    # fOut.write('    <DataArray NumberOfComponents="3" type="Float32" Name="Stress" format="ascii">\n    ')
+    # for data in elemdata:
+    #     fOut.write(' ' + str(data[0,0]) + ' ' + str(data[0,1]) + ' '+str(data[0,2]))
+    # fOut.write('\n    </DataArray>')
+    # fOut.write('\n   </CellData>\n')
     #DEFINO NODOS
     fOut.write('   <Points>\n')
     fOut.write('    <DataArray NumberOfComponents="3" type="Float32"  format="ascii">\n    ')
@@ -66,4 +66,4 @@ def writeXML(coords,conect,nodedata,elemdata , nameFile,nodeStress):
 
     fOut.close()
 if __name__ == '__main__':
-    writeXML(1,1,1,1,0,0)
+    writeXML(1,1,1,1,0)

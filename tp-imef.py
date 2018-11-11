@@ -69,13 +69,17 @@ for elem in conect:
 K = K.tocsc()
 brhs = brhs.tocsc()
 
+logging.info('Resolviendo...')
 U = spsolve(K,brhs)
+logging.info('Resuelto')
 
 storeValuesToNodes(coord,U)
 
 conectivity = computeDomainStress(conect)
 
 nodeCoordinates , nodeStress = createNodeData(coord)
+
+U = U.reshape((nNodos,2))
 
 writeXML(nodeCoordinates, conectivity , U, sys.argv[1], nodeStress)
 

@@ -1,5 +1,6 @@
 
 def searchline(palabra, f ):
+    print("Buscando: ",palabra)
     linea = f.readline()
     condicion = (palabra in linea)
     while not condicion:
@@ -7,7 +8,6 @@ def searchline(palabra, f ):
         condicion = (palabra in linea)
     if palabra in linea:
         # found linea
-        print ("found: ", palabra) # " at linea: ", l
         return linea, f
     else:
         print (palabra, ' not found')

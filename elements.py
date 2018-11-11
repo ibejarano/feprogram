@@ -45,6 +45,7 @@ def nodesAsign(tNodes,coordNodes):
 class ElemQ4:
     def __init__(self,nodes):
         self.nloc = nodes
+        self.H = self.buildMatrix()
 
     def localNodes(self):
         initList = []
@@ -95,26 +96,30 @@ class ElemQ4:
                 dHrs = self.fundHrs(gpr,gps)
                 He.append(dHrs)
         return He
+    
+    def calcJacobian(self,gps):
+        return self.H[gps] * self.getpos()
 
-    def getKe(self,He,C):
-        Pos = self.getpos()
+    def getKe(self,C):
         J = np.matrix(np.zeros((2,2)))
         Ke = np.matrix(np.zeros((8,8)))
         Be = np.matrix(np.zeros((3,8)))
         for i in range(4):
-            J = He[i]*Pos
+            J = self.calcJacobian(i)
             detJ = np.linalg.det(J)
-            B = self.funB(He[i],J)
+            B = self.funB(self.H[i],J)
             Ke += B.T * C * B * detJ *10
             Be += B * detJ *10
         self.Bstress = Be
         return Ke
 
-    def Stress(self,U,C,He):
+    def Stress(self,U,C):
+        '''
+        Deprecated
+        '''
         Pos = self.getpos()
         J = np.matrix(np.zeros((2,2)))
         Stre = np.matrix(np.zeros((3,1)))
-        Be = np.matrix(np.zeros((3,8)))
         Hoo = self.fundHrs(0,0)
         J = Hoo*Pos
         B = self.funB(Hoo,J)
@@ -124,15 +129,35 @@ class ElemQ4:
     def StressPost(self,Bel):
         self.CB = Bel
 
-    def calcBaricenter(xList):
+    def calcBaricenter(self,xList):
         xn = len(xList)
         baricenter = 0
         for x in xList:
             baricenter += x/xn
         return baricenter
 
-    # def computeStress(self):
-        
+    def getLocalDisplacement(self):
+        U = np.matrix(np.zeros((4,2)))
+        count = 0
+        for node in self.nloc:
+            U[count , 0] = node.xValue
+            U[count,1] = node.yValue
+            count+=1
+        U = U.reshape((8,1))
+        return U
+
+    def computeStress(self,C):
+        dH = self.fundHrs(0,0)
+        J = dH * self.getpos()
+        B = self.funB(dH,J)
+        U = self.getLocalDisplacement()
+        Stress = C * B * U
+        return Stress
+
+    def elemStressToNodes(self,stress):
+        for localNode in self.nloc:
+            localNode.storeStress(stress)
+        return 0
 
 class Node2D:
     nglob = 1
@@ -229,12 +254,3 @@ def Assemble(elem,Ke,K,brhs):
                 glj= nj*2
                 K[gl:gl+2,glj:glj+2] += Ke[i*2:i*2+2,j*2:j*2+2]
     return K , brhs
-
-def Ulocal(Umat,listaNodos):
-    Uaux = np.matrix(np.zeros((8,1)))
-    auxlist = []
-    for count, nod in enumerate(listaNodos):
-        #Uaux[count:count+2] = Umat[nod.nglob:nod.nglob+2,0]
-        auxlist.append(Umat[nod.nglob:nod.nglob+2])
-    Uaux = np.matrix(auxlist).reshape(8,1)
-    return Uaux

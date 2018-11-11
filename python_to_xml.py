@@ -66,4 +66,4 @@ def writeXML(coords,conect,nodedata,elemdata , nameFile,nodeStress):
 
     fOut.close()
 if __name__ == '__main__':
-    writeXML(1,1,1,1,0)
+    writeXML(1,1,1,1,0,0)

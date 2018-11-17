@@ -54,6 +54,10 @@ logging.basicConfig(level='INFO')
 fileGmsh = sys.argv[1]
 nNodos, coord = Constructor('$Nodes',fileGmsh,None)
 nElem, conect = Constructor('$Elements',fileGmsh,coord)
+
+t2 = datetime.now()
+logging.info('Leer de Gmsh: %f sec', (t2 - t1).total_seconds())
+
 C = conect[0].Cmat()
 
 
@@ -99,16 +103,32 @@ else:
         writeXML(nodeCoordinates, conectivity , U, sys.argv[1], nodeStress)
 
 fem = FemProblem(fileGmsh,nElem,nNodos,elemType,conect)
+
+t3 = datetime.now()
+logging.info('Crear elemento fem: %f sec', (t3 - t2).total_seconds())
+
 fem.setMatrix()
+
+t4 = datetime.now()
+logging.info('Seteo inicial de matrices: %f sec', (t4 - t3).total_seconds())
 
 #Seteo de condiciones de borde sobre los nodos
 bcList = [[0,0],[50,0]]
 
 setBC(coord, bcList)
 
+t5 = datetime.now()
+logging.info('Seteo de BC en nodos: %f sec', (t5 - t4).total_seconds())
+
 fem.assemble(C)
+
+t6 = datetime.now()
+logging.info('Ensamblaje de matrices: %f sec', (t6 - t5).total_seconds())
+
 U = spsolve(fem.K,fem.brhs)
 
+t7 = datetime.now()
+logging.info('Calculo de desplazamientos: %f sec', (t7 - t6).total_seconds())
 
 storeValuesToNodes(coord,U)
 conectivity = computeDomainStress(conect,fem.Hrs[8])
@@ -119,6 +139,6 @@ U = U.reshape((nNodos,2))
 writeXML(nodeCoordinates, conectivity , U, sys.argv[1], nodeStress)
 
 
-t2 = datetime.now()
-logging.info('Tiempo total: %f sec', (t2 - t1).total_seconds())
+t3 = datetime.now()
+logging.info('Tiempo total: %f sec', (t3 - t1).total_seconds())
 

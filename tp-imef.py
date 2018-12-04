@@ -1,4 +1,4 @@
-#!/usr/bin/python3.6
+#!/usr/bin/env python3
 
 import numpy as np
 import scipy.sparse as sp
@@ -124,7 +124,7 @@ fem.assemble(C)
 
 t6 = datetime.now()
 logging.info('Ensamblaje de matrices: %f sec', (t6 - t5).total_seconds())
-
+exit()
 U = spsolve(fem.K,fem.brhs)
 
 t7 = datetime.now()

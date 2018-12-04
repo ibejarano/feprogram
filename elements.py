@@ -206,7 +206,7 @@ class ElemQ9:
     def calcJacobian(self,gps,Hrs):
         pos = self.getpos()
         return Hrs[gps] * pos
-
+    @profile
     def getKe(self,H,Hrs,C):
         J = np.matrix(np.zeros((2,2)))
         Ke = np.matrix(np.zeros((18,18)))
@@ -328,13 +328,31 @@ class FemProblem:
         dhrs[1] = hs
         return dhrs    
 
+    def getRowData(self,elem,Ke):
+        '''
+        Optimized one
+        '''
+        listedNodes = [(x-1)*2+y for x in elem.localNodes() for y in [0,1]]
+        col = listedNodes*18
+        row = [ind for ind in listedNodes for i in range(18)]
+        Kelem = Ke.ravel()
+        return row , col , Kelem
+
     def assemble(self, C):
         #Armado de matrices elementales y ensamblaje
+        row = []
+        col = []
+        Kelem = []
         for elem in self.conectivity:
                 Ke = elem.getKe(self.H,self.Hrs,C)
-                self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
+                #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
+                rowap , colap , Kelemap = self.getRowData(elem,Ke)
+                row.extend(rowap)
+                col.extend(colap)
+                Kelem.append(Kelemap)
         #Setup de matrices esparsas
-        self.K = self.K.tocsc()
+        Kelem = np.array(Kelem).ravel()
+        self.K = sp.coo_matrix((Kelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tocsc()
         self.brhs = self.brhs.tocsc()
         return None
 
@@ -409,6 +427,7 @@ def funHrs(r,s):
     hrs = np.matrix([h1,h2,h3,h4])
     return hrs
 
+# @profile
 def Assemble(elem,Ke,K,brhs):
     '''
     elem: Objeto elemento
@@ -416,9 +435,14 @@ def Assemble(elem,Ke,K,brhs):
     K: Matriz global
     gl: grado de libertad = nnodos x 2, es el indice de la K global
     '''
+
+    row = [(x-1)*2+y for x in elem.localNodes() for y in [0,1]]
+    col = row
     for i in range(9):
         ni = elem.nloc[i].nglob-1
         gl = ni*2
+        helprow = [ni,ni+1]
+        row[i*2:i*2+2]=[ni,ni+1]
         if elem.nloc[i].DIRx and elem.nloc[i].DIRy :
             K[gl,gl] = 1
             K[gl+1,gl+1] = 1
@@ -428,8 +452,9 @@ def Assemble(elem,Ke,K,brhs):
             if elem.nloc[i].NEU:
                 brhs[gl] = elem.nloc[i].xForce
                 brhs[gl+1] = elem.nloc[i].yForce               
-            for j in range(9):
-                nj = elem.nloc[j].nglob-1
-                glj= nj*2
-                K[gl:gl+2,glj:glj+2] += Ke[i*2:i*2+2,j*2:j*2+2]
+        for j in range(9):
+            nj = elem.nloc[j].nglob-1
+            glj= nj*2
+            K[gl:gl+2,glj:glj+2] += Ke[i*2:i*2+2,j*2:j*2+2]
     return K , brhs
+

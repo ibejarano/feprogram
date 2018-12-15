@@ -259,7 +259,7 @@ class FemProblem:
             self.H = self.quad9H()
             self.Hrs = self.quad9Hrs()
             ncols = (self.nnode)*2
-            nrows = (self.nnode)*2 + len(self.bcNodes)*2
+            nrows = (self.nnode)*2
             self.K = sp.lil_matrix((nrows,ncols))
             self.brhs = sp.lil_matrix((nrows,1))
         else:
@@ -347,7 +347,6 @@ class FemProblem:
         row = []
         col = []
         Kelem = []
-        dirList = [1,1]
         for elem in self.conectivity:
             Ke = elem.getKe(self.H,self.Hrs,C)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
@@ -356,15 +355,22 @@ class FemProblem:
             col.extend(colap)
             Kelem.append(Kelemap)
 
-        for dirNodes in self.bcNodes:
-            bcrow = [(dirNodes-1)*2 , (dirNodes-1)*2 + 1 ]
-            row.extend(bcrow)
-            col.extend(bcrow)
-            Kelem.append(dirList)
         #Setup de matrices esparsas
         Kelem = np.array(Kelem).ravel()
-        bancaaK = sp.coo_matrix((Kelem,(row,col)),shape=((self.nnode+len(self.bcNodes))*2,self.nnode*2)).tocsc()
+        self.K = sp.coo_matrix((Kelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
         self.brhs = self.brhs.tocsc()
+
+        indexList = []
+        for dirInd in self.bcNodes:
+            i = (dirInd-1)*2
+            _, J = self.K[i,:].nonzero()
+            for j in J:
+                if j != i:
+                    indexList.append(j)
+                    self.K[i,j] = 0.0
+            self.K[i,i] = 1.0
+        self.K = self.K.tocsc()
+        
         return None
 
 class Node2D:

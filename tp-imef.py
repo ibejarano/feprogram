@@ -137,7 +137,7 @@ fem.assemble(C)
 
 t6 = datetime.now()
 logging.info('Ensamblaje de matrices: %f sec', (t6 - t5).total_seconds())
-exit()
+
 U = spsolve(fem.K,fem.brhs)
 
 t7 = datetime.now()

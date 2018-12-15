@@ -7,7 +7,7 @@ def searchElem(line,nElemLocal,listElements):
 
     pass
 
-def Constructor(entity,inpGmsh,cNodes):
+def Constructor(entity,inpGmsh,cNodes,bc=False):
     '''
     entity: Entidad para extraer datos de malla, puede ser $Nodes o $Elements
     inpGmsh: Input archivo .gmsh para extraer datos
@@ -34,30 +34,32 @@ def Constructor(entity,inpGmsh,cNodes):
 
         else:
             elemType = 'Q4'
-
-        while (len(intLine) < 9):
-            nod = intLine[5:len(intLine)]
-            physGroup = intLine[3]
-            for intNode in nod:
-                objNode = cNodes[intNode-1]
-                objNode.setBG(physGroup)
-            line = entityFile.readline()  
-            intLine = tuple(map(int,line.split()))
-            counter +=1
-        
-        if elemType == 'Q9':
-            while (line != '$EndElements\n'):
+        if bc:
+            while (len(intLine) < 9):
+                nod = intLine[5:len(intLine)]
+                physGroup = intLine[3]
+                for intNode in nod:
+                    objNode = cNodes[intNode-1]
+                    objNode.setBG(physGroup)
+                line = entityFile.readline()
                 intLine = tuple(map(int,line.split()))
-                objNodes = nodesAsign(intLine[5:len(intLine)],cNodes)
-                entityList.append(ElemQ9(objNodes)) #FIXME : corregir que no asigne solo a Q4
-                line = entityFile.readline()  
+                entityList.append(nod)
+                counter +=1
+            return nEntity , entityList
         else:
-            while (line != '$EndElements'):
-                intLine = tuple(map(int,line.split()))
-                objNodes = nodesAsign(intLine[5:len(intLine)],cNodes)
-                entityList.append(ElemQ9(objNodes))
-                line = entityFile.readline()  
-        nEntity -=1
+            if elemType == 'Q9':
+                while (line != '$EndElements\n'):
+                    intLine = tuple(map(int,line.split()))
+                    objNodes = nodesAsign(intLine[5:len(intLine)],cNodes)
+                    entityList.append(ElemQ9(objNodes)) #FIXME : corregir que no asigne solo a Q4
+                    line = entityFile.readline()  
+            else:
+                while (line != '$EndElements'):
+                    intLine = tuple(map(int,line.split()))
+                    objNodes = nodesAsign(intLine[5:len(intLine)],cNodes)
+                    entityList.append(ElemQ4(objNodes))
+                    line = entityFile.readline()  
+            nEntity -=1
     return nEntity  , entityList
 
 def nodesAsign(tNodes,coordNodes):
@@ -190,10 +192,10 @@ class ElemQ9:
     def funB(self,dHrs,J):
         B = np.matrix(np.zeros((3,18)))
         Jinv = np.linalg.inv(J)
-        DH = Jinv * dHrs
+        Dh = Jinv * dHrs
         for i in range(2):
-            B[i,i::2] = DH[i]
-            B[2,i::2] = DH[i-1]
+            B[i,i::2] = Dh[i]
+            B[2,i::2] = Dh[i-1]
         return B
 
     def getpos(self):
@@ -206,7 +208,7 @@ class ElemQ9:
     def calcJacobian(self,gps,Hrs):
         pos = self.getpos()
         return Hrs[gps] * pos
-    @profile
+    # @profile
     def getKe(self,H,Hrs,C):
         J = np.matrix(np.zeros((2,2)))
         Ke = np.matrix(np.zeros((18,18)))
@@ -245,19 +247,21 @@ class ElemQ9:
         return 0
 
 class FemProblem:
-    def __init__(self,meshName,nelem,nnode,elemType,conectivity):
+    def __init__(self,meshName,nelem,nnode,elemType,conectivity,bcNodes):
         self.nelem = nelem
         self.nnode = nnode
         self.elemType = elemType
         self.conectivity = conectivity
+        self.bcNodes = bcNodes
 
     def setMatrix(self):
         if self.elemType == 'Quad9':
             self.H = self.quad9H()
             self.Hrs = self.quad9Hrs()
-            nNodos = self.nnode
-            self.K = sp.lil_matrix((nNodos*2,nNodos*2))
-            self.brhs = sp.lil_matrix((nNodos*2,1))
+            ncols = (self.nnode)*2
+            nrows = (self.nnode)*2 + len(self.bcNodes)*2
+            self.K = sp.lil_matrix((nrows,ncols))
+            self.brhs = sp.lil_matrix((nrows,1))
         else:
             raise Exception('No se definió ningún tipo de elemento')
 
@@ -343,16 +347,23 @@ class FemProblem:
         row = []
         col = []
         Kelem = []
+        dirList = [1,1]
         for elem in self.conectivity:
-                Ke = elem.getKe(self.H,self.Hrs,C)
-                #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
-                rowap , colap , Kelemap = self.getRowData(elem,Ke)
-                row.extend(rowap)
-                col.extend(colap)
-                Kelem.append(Kelemap)
+            Ke = elem.getKe(self.H,self.Hrs,C)
+            #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
+            rowap , colap , Kelemap = self.getRowData(elem,Ke)
+            row.extend(rowap)
+            col.extend(colap)
+            Kelem.append(Kelemap)
+
+        for dirNodes in self.bcNodes:
+            bcrow = [(dirNodes-1)*2 , (dirNodes-1)*2 + 1 ]
+            row.extend(bcrow)
+            col.extend(bcrow)
+            Kelem.append(dirList)
         #Setup de matrices esparsas
         Kelem = np.array(Kelem).ravel()
-        self.K = sp.coo_matrix((Kelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tocsc()
+        bancaaK = sp.coo_matrix((Kelem,(row,col)),shape=((self.nnode+len(self.bcNodes))*2,self.nnode*2)).tocsc()
         self.brhs = self.brhs.tocsc()
         return None
 

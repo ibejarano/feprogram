@@ -48,12 +48,25 @@ def setBC(coordenadas , bcList):
                         nodin.physGrouptoValue(bcList)
         pass
 
+def removeDuplicates(tupledNodes):
+        listNodes = []
+        for i in tupledNodes:
+                for j in i:
+                        listNodes.append(j)
+        l = list(set(listNodes))
+        return listNodes
+
 t1 = datetime.now()
 logging.basicConfig(level='INFO')
 
 fileGmsh = sys.argv[1]
 nNodos, coord = Constructor('$Nodes',fileGmsh,None)
+nNodesBc , bcTupledNodes = Constructor('$Elements',fileGmsh,coord,bc=True)
+bcNodes = removeDuplicates(bcTupledNodes)
 nElem, conect = Constructor('$Elements',fileGmsh,coord)
+
+for pops in range(len(bcTupledNodes)):
+        conect.pop(0)
 
 t2 = datetime.now()
 logging.info('Leer de Gmsh: %f sec', (t2 - t1).total_seconds())
@@ -102,7 +115,7 @@ else:
         #Escribir archivo .vtu para ver en Paraview
         writeXML(nodeCoordinates, conectivity , U, sys.argv[1], nodeStress)
 
-fem = FemProblem(fileGmsh,nElem,nNodos,elemType,conect)
+fem = FemProblem(fileGmsh,nElem,nNodos,elemType,conect,bcNodes)
 
 t3 = datetime.now()
 logging.info('Crear elemento fem: %f sec', (t3 - t2).total_seconds())

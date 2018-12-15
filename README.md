@@ -19,16 +19,12 @@ Scipy
 * Database configuration
 Gmsh mesh generated
 * How to run tests
-in elements.py a little mesh is defined
+run bash runTP.sh
 * Deployment instructions
 
-### Contribution guidelines ###
+## Roadmap
 
-* Writing tests
-* Code review
-* Other guidelines
-
-### Who do I talk to? ###
-
-* Repo owner or admin
-* Other community or team contact
+- brhs assemble taking dirichlet or neumann boundary conditions to apply.
+- i need to clean so much stuff
+- implement elemQ4 again (elemQ9 broke it)
+- Stress plot not working

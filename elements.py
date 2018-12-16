@@ -490,33 +490,5 @@ def funHrs(r,s):
     return hrs
 
 # @profile
-def Assemble(elem,Ke,K,brhs):
-    '''
-    elem: Objeto elemento
-    Ke: Matriz de rigidez local a ensamblar en global
-    K: Matriz global
-    gl: grado de libertad = nnodos x 2, es el indice de la K global
-    '''
 
-    row = [(x-1)*2+y for x in elem.localNodes() for y in [0,1]]
-    col = row
-    for i in range(9):
-        ni = elem.nloc[i].nglob-1
-        gl = ni*2
-        helprow = [ni,ni+1]
-        row[i*2:i*2+2]=[ni,ni+1]
-        if elem.nloc[i].DIRx and elem.nloc[i].DIRy :
-            K[gl,gl] = 1
-            K[gl+1,gl+1] = 1
-            brhs[gl] = elem.nloc[i].xValue
-            brhs[gl+1] = elem.nloc[i].yValue
-        else :
-            if elem.nloc[i].NEU:
-                brhs[gl] = elem.nloc[i].xForce
-                brhs[gl+1] = elem.nloc[i].yForce               
-        for j in range(9):
-            nj = elem.nloc[j].nglob-1
-            glj= nj*2
-            K[gl:gl+2,glj:glj+2] += Ke[i*2:i*2+2,j*2:j*2+2]
-    return K , brhs
 

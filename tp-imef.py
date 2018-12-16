@@ -6,7 +6,7 @@ import sys
 import logging
 from gmshtools import readGmshFile
 from scipy.sparse.linalg import spsolve
-from elements import Node2D , ElemQ4 , Assemble , Constructor , FemProblem
+from elements import Node2D , ElemQ4, Constructor , FemProblem
 from datetime import datetime
 from python_to_xml import writeXML
 

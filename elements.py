@@ -355,6 +355,8 @@ class FemProblem:
         row = []
         col = []
         Kelem = []
+        forceX = 50
+        forceY = 0
         for elem in self.conectivity:
             Ke = elem.getKe(self.H,self.Hrs,C)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
@@ -366,20 +368,55 @@ class FemProblem:
         #Setup de matrices esparsas
         Kelem = np.array(Kelem).ravel()
         self.K = sp.coo_matrix((Kelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
-        self.brhs = self.brhs.tocsc()
 
         indexList = []
-        for dirInd in self.bcNodes:
+
+        #FIXME : This has to be done only in DIR nodes!
+        for dirInd in self.nodesDIR:
             i = (dirInd-1)*2
+            k = i+1
             _, J = self.K[i,:].nonzero()
+            _, T = self.K[k,:].nonzero()
             for j in J:
                 if j != i:
                     indexList.append(j)
                     self.K[i,j] = 0.0
+            for t in T:
+                if t != k:
+                    self.K[k,t] = 0.0
+            
             self.K[i,i] = 1.0
-        self.K = self.K.tocsc()
+            self.K[k,k] = 1.0
 
+        for nodeForce in self.nodesForce:
+            glx = (nodeForce - 1)*2
+            gly = glx+1
+            self.brhs[glx] = forceX
+            self.brhs[gly] = forceY
+
+        self.K = self.K.tocsc()
+        self.brhs = self.brhs.tocsc()
         return None
+
+    def setBoundaryConditions(self, coords):
+            '''
+            it only receives a tuple with nodes and assing only forces and construct brhs from element
+            '''
+            #the first One is Dirichlet and its meant to be K = 1 in that index
+            #if NEU brhs equals force
+            nodesDirichlet = []
+            nodesForce = []
+            for node in self.bcNodes:
+                if coords[node-1].bcGroup == 1:
+                    nodesDirichlet.append(node)
+                
+                else:
+                    nodesForce.append(node)
+
+            self.nodesDIR = nodesDirichlet
+            self.nodesForce = nodesForce
+
+            return None
 
 class Node2D:
     nglob = 1

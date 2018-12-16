@@ -48,16 +48,6 @@ def setBC(coordenadas , bcList):
                         nodin.physGrouptoValue(bcList)
         pass
 
-def setBoundaryConditions(coords , nodeList):
-        '''
-        it only receives a tuple with nodes and assing only forces and construct brhs from element
-        '''
-        #the first One is Dirichlet and its meant to be K = 1 in that index
-        #if NEU brhs equals force
-        forceX = 50
-        forceY = 0
-        pass
-
 
 def removeDuplicates(tupledNodes):
         listNodes = []
@@ -135,12 +125,8 @@ t4 = datetime.now()
 logging.info('Seteo inicial de matrices: %f sec', (t4 - t3).total_seconds())
 
 #Seteo de condiciones de borde sobre los nodos
-bcList = [[0,0],[50,0]]
 
-setBC(coord, bcList)
-
-setBoundaryConditions(coord, bcTupledNodes)
-
+fem.setBoundaryConditions(coord)
 
 t5 = datetime.now()
 logging.info('Seteo de BC en nodos: %f sec', (t5 - t4).total_seconds())

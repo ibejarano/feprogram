@@ -26,14 +26,6 @@ def Constructor(entity,inpGmsh,cNodes,bc=False):
         line = entityFile.readline()  
         intLine = tuple(map(int,line.split()))
         counter = 0
-        if len(intLine) == 8:
-            '''
-            Si los elementos definidos en los bordes es len 8 entonces Q9
-            '''
-            elemType = 'Q9'
-
-        else:
-            elemType = 'Q4'
         if bc:
             while (len(intLine) < 9):
                 nod = intLine[5:len(intLine)]
@@ -47,20 +39,35 @@ def Constructor(entity,inpGmsh,cNodes,bc=False):
                 counter +=1
             return nEntity , entityList
         else:
-            if elemType == 'Q9':
+            if len(intLine) == 8:
+                entityList = readElements(entityFile,entityList,'Q9',cNodes)
+
+            else:
                 while (line != '$EndElements\n'):
                     intLine = tuple(map(int,line.split()))
                     objNodes = nodesAsign(intLine[5:len(intLine)],cNodes)
-                    entityList.append(ElemQ9(objNodes)) #FIXME : corregir que no asigne solo a Q4
-                    line = entityFile.readline()  
-            else:
-                while (line != '$EndElements'):
-                    intLine = tuple(map(int,line.split()))
-                    objNodes = nodesAsign(intLine[5:len(intLine)],cNodes)
-                    entityList.append(ElemQ4(objNodes))
+                    entityList.append(Elem(objNodes,'Q4'))
                     line = entityFile.readline()  
             nEntity -=1
     return nEntity  , entityList
+
+def readElements(fileGmsh,conectivity,elemType,coords):
+    '''
+    Once it identifies the elemType it gets here and iterate
+    '''
+    line = ' '
+    intLine = []
+    while (len(intLine) < 9):
+        line = fileGmsh.readline() 
+        intLine = tuple(map(int,line.split()))
+
+    while (line != '$EndElements\n'):
+        intLine = tuple(map(int,line.split()))
+        objNodes = nodesAsign(intLine[5:len(intLine)],coords)
+        conectivity.append(Elem(objNodes,'Q9')) #FIXME : corregir que no asigne solo a Q4
+        line = fileGmsh.readline() 
+
+    return conectivity
 
 def nodesAsign(tNodes,coordNodes):
     '''
@@ -166,8 +173,9 @@ class ElemQ4:
             localNode.storeStress(stress)
         return 0
 
-class ElemQ9:
-    def __init__(self,nodes):
+class Elem:
+    def __init__(self,nodes,elemType):
+        self.elemType = elemType
         self.nloc = nodes
 
     def localNodes(self):
@@ -370,7 +378,7 @@ class FemProblem:
                     self.K[i,j] = 0.0
             self.K[i,i] = 1.0
         self.K = self.K.tocsc()
-        
+
         return None
 
 class Node2D:

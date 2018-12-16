@@ -142,12 +142,16 @@ t7 = datetime.now()
 logging.info('Calculo de desplazamientos: %f sec', (t7 - t6).total_seconds())
 
 storeValuesToNodes(coord,U)
-conectivity = computeDomainStress(conect,fem.Hrs[8])
 nodeCoordinates , nodeStress = createNodeData(coord)
 U = U.reshape((nNodos,2))
 
+
+conectivity_xml = np.zeros((len(conect),9))
+for ind , local in enumerate(conect):
+        conectivity_xml[ind] = local.localNodes()
+
 #Escribir archivo .vtu para ver en Paraview
-writeXML(nodeCoordinates, conectivity , U, sys.argv[1], nodeStress)
+writeXML(nodeCoordinates, conectivity_xml , U, sys.argv[1], nodeStress)
 
 
 t3 = datetime.now()

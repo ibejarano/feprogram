@@ -284,10 +284,13 @@ class FemProblem:
 
     def quad9Hrs(self):
         gpoints = [-0.774,0, 0.774]
+        gpweights = [0.55555 , 0.88888 , 0.55555]
         He = []
-        for gpr in gpoints:
-            for gps in gpoints:
-                dHrs = self.fundHrs(gpr,gps)
+        for weir , gpr in enumerate(gpoints):
+            for weis, gps in enumerate(gpoints):
+                gprWei = gpweights[weir] 
+                gpsWei = gpweights[weis]
+                dHrs = self.fundHrs(gpr,gps)*gprWei*gpsWei
                 He.append(dHrs)
         return He
 

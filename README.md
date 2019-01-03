@@ -1,11 +1,11 @@
 # README #
 
-### Implementado ###
+### What this code does? ###
 
 * Quick summary
-Repository of imef's work practice, not application defined yet.
+This is a code that solves a linear static problem using the Finite element method (FEM)
 * Version
-0.1
+Beta
 * [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
 
 ### How does this work? ###
@@ -19,12 +19,19 @@ Scipy
 * Database configuration
 Gmsh mesh generated
 * How to run tests
-run bash runTP.sh
-* Deployment instructions
+```
+bash runTP.sh
+```
 
 ## Roadmap
 
-- brhs assemble taking dirichlet or neumann boundary conditions to apply.
-- i need to clean so much stuff
-- implement elemQ4 again (elemQ9 broke it)
-- Stress plot not working
+1. Implement Q4 elements
+    2. K elem constructor
+    2. K assemble
+    2. bc imposition
+1. Implement Q9 elements
+    2. K elem constructor
+    2. K assemble
+    2. bc imposition
+1. Plot Displacements
+1. Plot Stress

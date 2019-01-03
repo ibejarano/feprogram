@@ -279,38 +279,53 @@ class FemProblem:
         self.brhs = sp.lil_matrix((nrows,1))
 
         if self.elemType == 'Quad9':
-            self.H = self.quad9H()
-            self.Hrs = self.quad9Hrs()
+            gpsList = [-0.774,0, 0.774]
+            gpsWei = [0.55555 , 0.88888 , 0.55555]
+            self.H = self.quadH(gpsList,self.funH9,gpsWei)
+            self.Hrs = self.quadHrs(gpsList,self.funHrs9,gpsWei)
         
         elif self.elemType == 'Quad4':
-            self.H = None
-            self.Hrs = None
+            gpsList = [-0.5777,0.5777] 
+            self.H = self.quadH(gpsList,self.funH4)
+            self.Hrs = self.quadHrs(gpsList,self.funHrs4)
 
         else:
             raise Exception('Invalid elemType defined you must use Quad4 or Quad9')
 
-    def quad9H(self):
-        gpoints = [-0.774,0, 0.774]
+
+    def quadH(self,gpoints,formFunction,gpweights=None):
         H = []
         for gpr in gpoints:
             for gps in gpoints:
-                dH = self.funH(gpr,gps)
+                dH = formFunction(gpr,gps)
                 H.append(dH)
         return H
 
-    def quad9Hrs(self):
-        gpoints = [-0.774,0, 0.774]
-        gpweights = [0.55555 , 0.88888 , 0.55555]
+    def quadHrs(self,gpoints,formFunction,gpweights=None):
         He = []
         for weir , gpr in enumerate(gpoints):
             for weis, gps in enumerate(gpoints):
-                gprWei = gpweights[weir] 
+                gprWei = gpweights[weir]
                 gpsWei = gpweights[weis]
-                dHrs = self.fundHrs(gpr,gps)*gprWei*gpsWei
+                dHrs = formFunction(gpr,gps)*gprWei*gpsWei
                 He.append(dHrs)
         return He
 
-    def funH(self,r,s):
+    def funH4(self,r,s):
+        r_plus = 1+r
+        r_minus = 1-r
+        s_plus = 1+s
+        s_minus = 1-s
+
+        h4 = 0.25*r_plus*s_minus
+        h3 = 0.25*r_minus*s_minus
+        h2 = 0.25*r_minus*s_plus
+        h1 = 0.25*r_plus*s_plus
+
+        H=np.matrix([h1,h2,h3,h4])
+        return H
+
+    def funH9(self,r,s):
         r_power = 1- r**2
         s_power = 1-s**2
         r_plus = 1+r
@@ -332,7 +347,23 @@ class FemProblem:
 
         return H
 
-    def fundHrs(self,r,s):
+    def funHrs4(self,r,s):
+        hrquad4 = [1+s , -1-s , -1+s ,1-s]
+        hsquad4 = [1+r,1-r , -1 +r , -1 -r]
+
+        hr = [0]*4
+        hs = [0]*4
+        for i in range(4):
+            hr[i] = 0.25*hrquad4[i]
+            hs[i] = 0.25*hsquad4[i]
+
+        dhrs = np.matrix(np.zeros((2,4)))
+
+        dhrs[0] = hr
+        dhrs[1] = hs
+        return dhrs    
+
+    def funHrs9(self,r,s):
         hrquad4 = [1+s , -1-s , -1 +s ,1-s]
         hrquad8 = [-r*(1+s),-0.5*(1-s**2),-r*(1-s),0.5*(1-s**2)]
         hrquad9 = -2*r*(1-s**2)
@@ -501,12 +532,7 @@ class Node2D:
 
 def funHrs(r,s):
     #FIXME: FUNCION NO IMPLEMENTADA, CONTIENE LAS FUNCIONES DE INTERPOLACION
-    h1 = 0.25*(1+r)*(1+s)
-    h2 = 0.25*(1-r)*(1+s)
-    h3 = 0.25*(1-r)*(1-s)
-    h4 = 0.25*(1+r)*(1-s)
-    hrs = np.matrix([h1,h2,h3,h4])
-    return hrs
+    pass
 
 # @profile
 

@@ -288,17 +288,17 @@ class FemProblem:
 
     def funHrs9(self,r,s):
         hrquad4 = [1+s , -1-s , -1 +s ,1-s]
-        hrquad8 = [-r*(1+s),-0.5*(1-s**2),-r*(1-s),0.5*(1-s**2)]
+        hrquad8 = [-2*r*(1+s),-1*(1-s**2),-2*r*(1-s),(1-s**2)]
         hrquad9 = -2*r*(1-s**2)
-        hsquad4 = [1+r,1-r , -1 +r , -1 -r]
-        hsquad8 = [0.5*(1-r**2),-s*(1-r),-0.5*(1-r**2),-s*(1+r)]
-        hsquad9 = -2*r*(1-r**2)
+        hsquad4 = [1+r,1-r ,-1+r ,-1-r]
+        hsquad8 = [(1-r**2),-2*s*(1-r),-1*(1-r**2),-2*s*(1+r)]
+        hsquad9 = -2*s*(1-r**2)
 
         hr = [0]*9
         hs = [0]*9
         for i in range(4):
-            hr[i] = 0.25*hrquad4[i] - 0.25*hrquad8[i] - 0.25*hrquad8[i-1] - 0.25*hrquad9
-            hs[i] = 0.25*hsquad4[i] - 0.25*hsquad8[i] - 0.25*hsquad8[i-1] - 0.25*hsquad9
+            hr[i] = 0.25*hrquad4[i] - 0.5*0.5*hrquad8[i] - 0.5*0.5*hrquad8[i-1] - 0.25*hrquad9
+            hs[i] = 0.25*hsquad4[i] - 0.5*0.5*hsquad8[i] - 0.5*0.5*hsquad8[i-1] - 0.25*hsquad9
 
         for i in range(4):
             hr[i+4] = 0.5*hrquad8[i] - 0.5*hrquad9

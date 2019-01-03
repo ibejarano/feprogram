@@ -198,7 +198,6 @@ class FemProblem:
         else:
             raise Exception('Invalid elemType defined you must use Quad4 or Quad9')
 
-
     def quadH(self,gpoints,formFunction,gpweights=None):
         H = []
         for gpr in gpoints:
@@ -249,7 +248,7 @@ class FemProblem:
         return H
 
     def funH9(self,r,s):
-        r_power = 1- r**2
+        r_power = 1-r**2
         s_power = 1-s**2
         r_plus = 1+r
         r_minus = 1-r

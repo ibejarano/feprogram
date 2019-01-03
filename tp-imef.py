@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import numpy as np
 import scipy.sparse as sp
 import sys
@@ -110,7 +109,7 @@ nodeCoordinates , nodeStress = createNodeData(coord)
 U = U.reshape((nNodos,2))
 
 
-conectivity_xml = np.zeros((len(conect),9))
+conectivity_xml = np.zeros((len(conect),len(conect[0].nloc)))
 for ind , local in enumerate(conect):
         conectivity_xml[ind] = local.localNodes()
 

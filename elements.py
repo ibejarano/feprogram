@@ -39,11 +39,7 @@ def Constructor(entity,inpGmsh,cNodes,bc=False):
                 entityList = readElements(entityFile,entityList,'Q9',cNodes)
 
             else:
-                while (line != '$EndElements\n'):
-                    intLine = tuple(map(int,line.split()))
-                    objNodes = nodesAsign(intLine[5:len(intLine)],cNodes)
-                    entityList.append(Elem(objNodes,'Q4'))
-                    line = entityFile.readline()  
+                entityList = readElements(entityFile,entityList,'Q4',cNodes)
             nEntity -=1
     return nEntity  , entityList
 
@@ -60,7 +56,7 @@ def readElements(fileGmsh,conectivity,elemType,coords):
     while (line != '$EndElements\n'):
         intLine = tuple(map(int,line.split()))
         objNodes = nodesAsign(intLine[5:len(intLine)],coords)
-        conectivity.append(Elem(objNodes,'Q9')) #FIXME : corregir que no asigne solo a Q4
+        conectivity.append(Elem(objNodes,elemType))
         line = fileGmsh.readline() 
 
     return conectivity
@@ -194,7 +190,8 @@ class Elem:
 
 
     def funB(self,dHrs,J):
-        B = np.matrix(np.zeros((3,18)))
+        dof = len(self.nloc)*2
+        B = np.matrix(np.zeros((3,dof)))
         Jinv = np.linalg.inv(J)
         Dh = Jinv * dHrs
         for i in range(2):
@@ -204,7 +201,8 @@ class Elem:
 
     def getpos(self):
         auxlist = []
-        for i in range(9):
+        nNodeslocal = len(self.nloc)
+        for i in range(nNodeslocal):
             auxlist.append([self.nloc[i].x,self.nloc[i].y])
         return np.matrix(auxlist)   
 
@@ -214,10 +212,11 @@ class Elem:
         return Hrs[gps] * pos
     # @profile
     def getKe(self,H,Hrs,C):
+        dof = len(self.nloc)*2
         J = np.matrix(np.zeros((2,2)))
-        Ke = np.matrix(np.zeros((18,18)))
-        Be = np.matrix(np.zeros((3,18)))
-        for i in range(9):
+        Ke = np.matrix(np.zeros((dof,dof)))
+        Be = np.matrix(np.zeros((3,dof)))
+        for i in range(int(dof/2)):
             J = self.calcJacobian(i,Hrs)
             detJ = np.linalg.det(J)
             B = self.funB(Hrs[i],J)
@@ -279,38 +278,68 @@ class FemProblem:
         self.brhs = sp.lil_matrix((nrows,1))
 
         if self.elemType == 'Quad9':
-            self.H = self.quad9H()
-            self.Hrs = self.quad9Hrs()
+            gpsList = [-0.774,0, 0.774]
+            gpsWei = [0.55555 , 0.88888 , 0.55555]
+            self.H = self.quadH(gpsList,self.funH9,gpsWei)
+            self.Hrs = self.quadHrs(gpsList,self.funHrs9,gpsWei)
         
         elif self.elemType == 'Quad4':
-            self.H = None
-            self.Hrs = None
+            gpsList = [-0.5777,0.5777]
+            gpsWei = [1,1]
+            self.H = self.quadH(gpsList,self.funH4,gpsWei)
+            self.Hrs = self.quadHrs(gpsList,self.funHrs4,gpsWei)
 
         else:
             raise Exception('Invalid elemType defined you must use Quad4 or Quad9')
 
-    def quad9H(self):
-        gpoints = [-0.774,0, 0.774]
+
+    def quadH(self,gpoints,formFunction,gpweights=None):
         H = []
         for gpr in gpoints:
             for gps in gpoints:
-                dH = self.funH(gpr,gps)
+                dH = formFunction(gpr,gps)
                 H.append(dH)
         return H
 
-    def quad9Hrs(self):
-        gpoints = [-0.774,0, 0.774]
-        gpweights = [0.55555 , 0.88888 , 0.55555]
+    def quadHrs(self,gpoints,formFunction,gpweights=None):
+        '''Creates an array that has the derivatives of form
+        function evaluated at gauss points
+        
+        Arguments:
+            gpoints {list[float]} -- List with gauss points
+            formFunction {callback} -- returns the gp evaluated
+        
+        Keyword Arguments:
+            gpweights {list[float]} -- it weight numerical integration (default: {None})
+        
+        Returns:
+            He [array] -- contains the functions evaluated at gausspoints and ordered
+        '''
+
         He = []
         for weir , gpr in enumerate(gpoints):
             for weis, gps in enumerate(gpoints):
-                gprWei = gpweights[weir] 
+                gprWei = gpweights[weir]
                 gpsWei = gpweights[weis]
-                dHrs = self.fundHrs(gpr,gps)*gprWei*gpsWei
+                dHrs = formFunction(gpr,gps)*gprWei*gpsWei
                 He.append(dHrs)
         return He
 
-    def funH(self,r,s):
+    def funH4(self,r,s):
+        r_plus = 1+r
+        r_minus = 1-r
+        s_plus = 1+s
+        s_minus = 1-s
+
+        h4 = 0.25*r_plus*s_minus
+        h3 = 0.25*r_minus*s_minus
+        h2 = 0.25*r_minus*s_plus
+        h1 = 0.25*r_plus*s_plus
+
+        H=np.matrix([h1,h2,h3,h4])
+        return H
+
+    def funH9(self,r,s):
         r_power = 1- r**2
         s_power = 1-s**2
         r_plus = 1+r
@@ -332,7 +361,23 @@ class FemProblem:
 
         return H
 
-    def fundHrs(self,r,s):
+    def funHrs4(self,r,s):
+        hrquad4 = [1+s , -1-s , -1+s ,1-s]
+        hsquad4 = [1+r,1-r , -1 +r , -1 -r]
+
+        hr = [0]*4
+        hs = [0]*4
+        for i in range(4):
+            hr[i] = 0.25*hrquad4[i]
+            hs[i] = 0.25*hsquad4[i]
+
+        dhrs = np.matrix(np.zeros((2,4)))
+
+        dhrs[0] = hr
+        dhrs[1] = hs
+        return dhrs    
+
+    def funHrs9(self,r,s):
         hrquad4 = [1+s , -1-s , -1 +s ,1-s]
         hrquad8 = [-r*(1+s),-0.5*(1-s**2),-r*(1-s),0.5*(1-s**2)]
         hrquad9 = -2*r*(1-s**2)
@@ -363,9 +408,10 @@ class FemProblem:
         '''
         Optimized one
         '''
+        dof = len(elem.nloc)*2
         listedNodes = [(x-1)*2+y for x in elem.localNodes() for y in [0,1]]
-        col = listedNodes*18
-        row = [ind for ind in listedNodes for i in range(18)]
+        col = listedNodes*dof
+        row = [ind for ind in listedNodes for i in range(dof)]
         Kelem = Ke.ravel()
         return row , col , Kelem
 
@@ -501,12 +547,7 @@ class Node2D:
 
 def funHrs(r,s):
     #FIXME: FUNCION NO IMPLEMENTADA, CONTIENE LAS FUNCIONES DE INTERPOLACION
-    h1 = 0.25*(1+r)*(1+s)
-    h2 = 0.25*(1-r)*(1+s)
-    h3 = 0.25*(1-r)*(1-s)
-    h4 = 0.25*(1+r)*(1-s)
-    hrs = np.matrix([h1,h2,h3,h4])
-    return hrs
+    pass
 
 # @profile
 

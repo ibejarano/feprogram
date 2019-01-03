@@ -26,12 +26,12 @@ bash runTP.sh
 ## Roadmap
 
 1. Implement Q4 elements
-    2. K elem constructor
+    1. K elem constructor
     2. K assemble
-    2. bc imposition
-1. Implement Q9 elements
-    2. K elem constructor
+    3. bc imposition
+2. Implement Q9 elements
+    1. K elem constructor
     2. K assemble
-    2. bc imposition
-1. Plot Displacements
-1. Plot Stress
+    3. bc imposition
+3. Plot Displacements
+4. Plot Stress

@@ -19,19 +19,6 @@ def storeValuesToNodes(nodeArray,values):
                 nodeArray[i].storeCalcValue(values[i,0],values[i,1])
         return None
 
-def computeDomainStress(elemMat,Hrs):
-        nelem = len(elemMat)
-        outConect = np.zeros((nelem,4))
-        Stress = np.matrix(np.zeros((nelem,3)))
-
-        for elemRow , elem in enumerate(elemMat):
-                outConect[elemRow] = [elem.nloc[k].nglob -1  for k in range(4)]
-                elemStress = elem.computeStress(C,Hrs).T
-                Stress[elemRow] = elemStress
-                elemMat[elemRow].elemStressToNodes(elemStress)
-        return outConect
-
-
 def createNodeData(nodeMat):
         outCoords = np.zeros((nNodos,3))
         outNodesStress = np.zeros((nNodos,3))
@@ -40,20 +27,11 @@ def createNodeData(nodeMat):
                 outNodesStress[nodeRow] = node.stress
         return outCoords , outNodesStress
 
-def setBC(coordenadas , bcList):
-        #Seteo de BC en nodos
-        for nodin in coordenadas:
-                if nodin.BG:
-                        nodin.physGrouptoValue(bcList)
-        pass
-
-
 def removeDuplicates(tupledNodes):
         listNodes = []
         for i in tupledNodes:
                 for j in i:
                         listNodes.append(j)
-        l = list(set(listNodes))
         return listNodes
 
 t1 = datetime.now()
@@ -88,7 +66,6 @@ t4 = datetime.now()
 logging.info('Seteo inicial de matrices: %f sec', (t4 - t3).total_seconds())
 
 #Seteo de condiciones de borde sobre los nodos
-
 fem.setBoundaryConditions(coord)
 
 t5 = datetime.now()

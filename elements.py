@@ -367,7 +367,6 @@ class FemProblem:
 
         self.K = self.K.tocsc()
         self.brhs = self.brhs.tocsc()
-        return None
 
     def setBoundaryConditions(self, coords):
             '''
@@ -386,8 +385,6 @@ class FemProblem:
 
             self.nodesDIR = nodesDirichlet
             self.nodesForce = nodesForce
-
-            return None
 
 class Node2D:
     nglob = 1

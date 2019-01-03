@@ -7,6 +7,7 @@ def writeXML(coords, conect, nodedata, nameFile, nodeStress):
     '''
     nnode = coords.shape[0]
     nelem = conect.shape[0]
+    cellType = 9 if conect.shape[1] == 4 else 28
     fOut = open(nameFile.split(".")[0]+".vtu","w")
     # fOut = open("Testingtesting.vtu","w")
     #HEADER
@@ -15,11 +16,11 @@ def writeXML(coords, conect, nodedata, nameFile, nodeStress):
     fOut.write('  <Piece NumberOfPoints="{}" NumberOfCells="{}">\n'.format(nnode,nelem))
     #ESCRIBO LOS DATOS DE LOS NODOS STRESS
     fOut.write('   <PointData Vectors="Tensiones">\n')
-    fOut.write('    <DataArray Name="Tensiones" NumberOfComponents="3" type="Float32"  format="ascii">\n    ')
-    for data in nodeStress:
-        fOut.write(' {} {} {}\n'.format(data[0],data[1],data[2]))
-    fOut.write('\n    </DataArray>')
-    #ESCRIBO LOS DATOS DE LOS NODOS DISPLACEMENTS
+    # fOut.write('    <DataArray Name="Tensiones" NumberOfComponents="3" type="Float32"  format="ascii">\n    ')
+    # for data in nodeStress:
+    #     fOut.write(' {} {} {}\n'.format(data[0],data[1],data[2]))
+    # fOut.write('\n    </DataArray>')
+    # #ESCRIBO LOS DATOS DE LOS NODOS DISPLACEMENTS
     fOut.write('    <DataArray Name="Displacement" NumberOfComponents="2" type="Float32" format="ascii">\n    ')
     for data in nodedata:
         fOut.write(' {} {}\n'.format(data[0],data[1]))
@@ -41,21 +42,23 @@ def writeXML(coords, conect, nodedata, nameFile, nodeStress):
     fOut.write('\n   </Points>\n')
     #DEFINO ELEMENTOS
     fOut.write('   <Cells>\n')
-    fOut.write('    <DataArray type="Int32" Name="connectivity" format="ascii" RangeMin="{}" RangeMax="{}">\n    '.format(1,nnode))
+    fOut.write('    <DataArray type="Int32" Name="connectivity" format="ascii" RangeMin="" RangeMax="">\n')
     for data in conect:
-        fOut.write(' ' + str(int(data[0])) + ' ' + str(int(data[1]))  + ' '+ str(int(data[2]))  + ' '+ str(int(data[3])))
+        for i in data:
+            fOut.write(' ' + str(int(i)-1))
     fOut.write('\n    </DataArray>\n')
 
-    fOut.write('    <DataArray type="Int32" Name="offsets" format="ascii" RangeMin="{}" RangeMax="{}">\n    '.format(4,4*nelem))
-    aux = 4
+    fOut.write('    <DataArray type="Int32" Name="offsets" format="ascii" RangeMin="" RangeMax="">\n')
+    aux = 4 if cellType == 9 else 9
+    auxTwo = 4 if cellType == 9 else 9
     for data in conect:
         fOut.write(' ' + str(aux))
-        aux +=4
+        aux += auxTwo
     fOut.write('\n    </DataArray>\n')
 
-    fOut.write('    <DataArray type="Int32" Name="types" format="ascii" RangeMin="{}" RangeMax="{}">\n    '.format(9,9))
+    fOut.write('    <DataArray type="Int32" Name="types" format="ascii" RangeMin="" RangeMax="">\n')
     for data in conect:
-        fOut.write(' ' + str(9))
+        fOut.write(' ' + str(cellType))
     fOut.write('\n    </DataArray>')
     fOut.write('\n   </Cells>\n')
 

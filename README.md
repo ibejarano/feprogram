@@ -1,11 +1,11 @@
 # README #
 
-### Implementado ###
+### What this code does? ###
 
 * Quick summary
-Repository of imef's work practice, not application defined yet.
+This is a code that solves a linear static problem using the Finite element method (FEM)
 * Version
-0.1
+Beta
 * [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
 
 ### How does this work? ###
@@ -19,16 +19,19 @@ Scipy
 * Database configuration
 Gmsh mesh generated
 * How to run tests
-in elements.py a little mesh is defined
-* Deployment instructions
+```
+bash runTP.sh
+```
 
-### Contribution guidelines ###
+## Roadmap
 
-* Writing tests
-* Code review
-* Other guidelines
-
-### Who do I talk to? ###
-
-* Repo owner or admin
-* Other community or team contact
+1. Implement Q4 elements
+    2. K elem constructor
+    2. K assemble
+    2. bc imposition
+1. Implement Q9 elements
+    2. K elem constructor
+    2. K assemble
+    2. bc imposition
+1. Plot Displacements
+1. Plot Stress

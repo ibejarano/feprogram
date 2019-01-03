@@ -6,7 +6,7 @@ import sys
 import logging
 from gmshtools import readGmshFile
 from scipy.sparse.linalg import spsolve
-from elements import Node2D , ElemQ4 , Assemble , Constructor , FemProblem
+from elements import Node2D , ElemQ4, Constructor , FemProblem
 from datetime import datetime
 from python_to_xml import writeXML
 
@@ -48,6 +48,7 @@ def setBC(coordenadas , bcList):
                         nodin.physGrouptoValue(bcList)
         pass
 
+
 def removeDuplicates(tupledNodes):
         listNodes = []
         for i in tupledNodes:
@@ -65,8 +66,6 @@ nNodesBc , bcTupledNodes = Constructor('$Elements',fileGmsh,coord,bc=True)
 bcNodes = removeDuplicates(bcTupledNodes)
 nElem, conect = Constructor('$Elements',fileGmsh,coord)
 
-for pops in range(len(bcTupledNodes)):
-        conect.pop(0)
 
 t2 = datetime.now()
 logging.info('Leer de Gmsh: %f sec', (t2 - t1).total_seconds())
@@ -79,42 +78,6 @@ if len(conect[0].nloc) == 9:
 else:
         elemType = 'Quad4'
 
-
-        #Inicio de matriz global
-        K = sp.lil_matrix((nNodos*2,nNodos*2))
-        brhs = sp.lil_matrix((nNodos*2,1))
-
-        #Formato de cond de borde
-        bcList = [[0,0],[400,200]]
-
-        #Seteo de BC en nodos
-        for nodin in coord:
-                if nodin.BG:
-                        nodin.physGrouptoValue(bcList)
-
-        #Armado de matrices elementales y ensamblaje
-        for elem in conect:
-                Ke = elem.getKe(C)
-                K , brhs = Assemble(elem, Ke , K , brhs)
-
-        #Setup de matrices esparsas
-        K = K.tocsc()
-        brhs = brhs.tocsc()
-
-        #Resolucion
-        logging.info('Resolviendo...')
-        U = spsolve(K,brhs)
-        logging.info('Resuelto')
-        storeValuesToNodes(coord,U)
-
-        #Preparacion de Arrays para postproceso
-        conectivity = computeDomainStress(conect)
-        nodeCoordinates , nodeStress = createNodeData(coord)
-        U = U.reshape((nNodos,2))
-
-        #Escribir archivo .vtu para ver en Paraview
-        writeXML(nodeCoordinates, conectivity , U, sys.argv[1], nodeStress)
-
 fem = FemProblem(fileGmsh,nElem,nNodos,elemType,conect,bcNodes)
 
 t3 = datetime.now()
@@ -126,9 +89,8 @@ t4 = datetime.now()
 logging.info('Seteo inicial de matrices: %f sec', (t4 - t3).total_seconds())
 
 #Seteo de condiciones de borde sobre los nodos
-bcList = [[0,0],[50,0]]
 
-setBC(coord, bcList)
+fem.setBoundaryConditions(coord)
 
 t5 = datetime.now()
 logging.info('Seteo de BC en nodos: %f sec', (t5 - t4).total_seconds())
@@ -137,19 +99,23 @@ fem.assemble(C)
 
 t6 = datetime.now()
 logging.info('Ensamblaje de matrices: %f sec', (t6 - t5).total_seconds())
-exit()
+
 U = spsolve(fem.K,fem.brhs)
 
 t7 = datetime.now()
 logging.info('Calculo de desplazamientos: %f sec', (t7 - t6).total_seconds())
 
 storeValuesToNodes(coord,U)
-conectivity = computeDomainStress(conect,fem.Hrs[8])
 nodeCoordinates , nodeStress = createNodeData(coord)
 U = U.reshape((nNodos,2))
 
+
+conectivity_xml = np.zeros((len(conect),9))
+for ind , local in enumerate(conect):
+        conectivity_xml[ind] = local.localNodes()
+
 #Escribir archivo .vtu para ver en Paraview
-writeXML(nodeCoordinates, conectivity , U, sys.argv[1], nodeStress)
+writeXML(nodeCoordinates, conectivity_xml , U, sys.argv[1], nodeStress)
 
 
 t3 = datetime.now()

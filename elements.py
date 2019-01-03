@@ -3,10 +3,6 @@ import scipy.sparse as sp
 from gmshtools import readGmshFile
 import numpy as np
 
-def searchElem(line,nElemLocal,listElements):
-
-    pass
-
 def Constructor(entity,inpGmsh,cNodes,bc=False):
     '''
     entity: Entidad para extraer datos de malla, puede ser $Nodes o $Elements
@@ -26,14 +22,6 @@ def Constructor(entity,inpGmsh,cNodes,bc=False):
         line = entityFile.readline()  
         intLine = tuple(map(int,line.split()))
         counter = 0
-        if len(intLine) == 8:
-            '''
-            Si los elementos definidos en los bordes es len 8 entonces Q9
-            '''
-            elemType = 'Q9'
-
-        else:
-            elemType = 'Q4'
         if bc:
             while (len(intLine) < 9):
                 nod = intLine[5:len(intLine)]
@@ -47,20 +35,35 @@ def Constructor(entity,inpGmsh,cNodes,bc=False):
                 counter +=1
             return nEntity , entityList
         else:
-            if elemType == 'Q9':
+            if len(intLine) == 8:
+                entityList = readElements(entityFile,entityList,'Q9',cNodes)
+
+            else:
                 while (line != '$EndElements\n'):
                     intLine = tuple(map(int,line.split()))
                     objNodes = nodesAsign(intLine[5:len(intLine)],cNodes)
-                    entityList.append(ElemQ9(objNodes)) #FIXME : corregir que no asigne solo a Q4
-                    line = entityFile.readline()  
-            else:
-                while (line != '$EndElements'):
-                    intLine = tuple(map(int,line.split()))
-                    objNodes = nodesAsign(intLine[5:len(intLine)],cNodes)
-                    entityList.append(ElemQ4(objNodes))
+                    entityList.append(Elem(objNodes,'Q4'))
                     line = entityFile.readline()  
             nEntity -=1
     return nEntity  , entityList
+
+def readElements(fileGmsh,conectivity,elemType,coords):
+    '''
+    Once it identifies the elemType it gets here and iterate
+    '''
+    line = ' '
+    intLine = []
+    while (len(intLine) < 9):
+        line = fileGmsh.readline() 
+        intLine = tuple(map(int,line.split()))
+
+    while (line != '$EndElements\n'):
+        intLine = tuple(map(int,line.split()))
+        objNodes = nodesAsign(intLine[5:len(intLine)],coords)
+        conectivity.append(Elem(objNodes,'Q9')) #FIXME : corregir que no asigne solo a Q4
+        line = fileGmsh.readline() 
+
+    return conectivity
 
 def nodesAsign(tNodes,coordNodes):
     '''
@@ -166,8 +169,9 @@ class ElemQ4:
             localNode.storeStress(stress)
         return 0
 
-class ElemQ9:
-    def __init__(self,nodes):
+class Elem:
+    def __init__(self,nodes,elemType):
+        self.elemType = elemType
         self.nloc = nodes
 
     def localNodes(self):
@@ -255,15 +259,35 @@ class FemProblem:
         self.bcNodes = bcNodes
 
     def setMatrix(self):
+        """[summary]
+            This function setups Empty K , brhs in all cases
+            H & Hrs depends on ElemType
+
+        Raises:
+            Exception -- [description]
+
+        Returns:
+            K[lil_matrix] -- Empty Global rigidity matrix
+            brhs[lil_matrix] -- Empty Right hand side vector
+            H[array] -- Array with form functions evaluated in gps
+            Hrs[array] -- It haves the derivatives in gps
+        """
+
+        ncols = (self.nnode)*2
+        nrows = (self.nnode)*2
+        self.K = sp.lil_matrix((nrows,ncols))
+        self.brhs = sp.lil_matrix((nrows,1))
+
         if self.elemType == 'Quad9':
             self.H = self.quad9H()
             self.Hrs = self.quad9Hrs()
-            ncols = (self.nnode)*2
-            nrows = (self.nnode)*2 + len(self.bcNodes)*2
-            self.K = sp.lil_matrix((nrows,ncols))
-            self.brhs = sp.lil_matrix((nrows,1))
+        
+        elif self.elemType == 'Quad4':
+            self.H = None
+            self.Hrs = None
+
         else:
-            raise Exception('No se definió ningún tipo de elemento')
+            raise Exception('Invalid elemType defined you must use Quad4 or Quad9')
 
     def quad9H(self):
         gpoints = [-0.774,0, 0.774]
@@ -276,10 +300,13 @@ class FemProblem:
 
     def quad9Hrs(self):
         gpoints = [-0.774,0, 0.774]
+        gpweights = [0.55555 , 0.88888 , 0.55555]
         He = []
-        for gpr in gpoints:
-            for gps in gpoints:
-                dHrs = self.fundHrs(gpr,gps)
+        for weir , gpr in enumerate(gpoints):
+            for weis, gps in enumerate(gpoints):
+                gprWei = gpweights[weir] 
+                gpsWei = gpweights[weis]
+                dHrs = self.fundHrs(gpr,gps)*gprWei*gpsWei
                 He.append(dHrs)
         return He
 
@@ -347,7 +374,8 @@ class FemProblem:
         row = []
         col = []
         Kelem = []
-        dirList = [1,1]
+        forceX = 50
+        forceY = 0
         for elem in self.conectivity:
             Ke = elem.getKe(self.H,self.Hrs,C)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
@@ -356,16 +384,58 @@ class FemProblem:
             col.extend(colap)
             Kelem.append(Kelemap)
 
-        for dirNodes in self.bcNodes:
-            bcrow = [(dirNodes-1)*2 , (dirNodes-1)*2 + 1 ]
-            row.extend(bcrow)
-            col.extend(bcrow)
-            Kelem.append(dirList)
         #Setup de matrices esparsas
         Kelem = np.array(Kelem).ravel()
-        bancaaK = sp.coo_matrix((Kelem,(row,col)),shape=((self.nnode+len(self.bcNodes))*2,self.nnode*2)).tocsc()
+        self.K = sp.coo_matrix((Kelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
+
+        indexList = []
+
+        #FIXME : This has to be done only in DIR nodes!
+        for dirInd in self.nodesDIR:
+            i = (dirInd-1)*2
+            k = i+1
+            _, J = self.K[i,:].nonzero()
+            _, T = self.K[k,:].nonzero()
+            for j in J:
+                if j != i:
+                    indexList.append(j)
+                    self.K[i,j] = 0.0
+            for t in T:
+                if t != k:
+                    self.K[k,t] = 0.0
+            
+            self.K[i,i] = 1.0
+            self.K[k,k] = 1.0
+
+        for nodeForce in self.nodesForce:
+            glx = (nodeForce - 1)*2
+            gly = glx+1
+            self.brhs[glx] = forceX
+            self.brhs[gly] = forceY
+
+        self.K = self.K.tocsc()
         self.brhs = self.brhs.tocsc()
         return None
+
+    def setBoundaryConditions(self, coords):
+            '''
+            it only receives a tuple with nodes and assing only forces and construct brhs from element
+            '''
+            #the first One is Dirichlet and its meant to be K = 1 in that index
+            #if NEU brhs equals force
+            nodesDirichlet = []
+            nodesForce = []
+            for node in self.bcNodes:
+                if coords[node-1].bcGroup == 1:
+                    nodesDirichlet.append(node)
+                
+                else:
+                    nodesForce.append(node)
+
+            self.nodesDIR = nodesDirichlet
+            self.nodesForce = nodesForce
+
+            return None
 
 class Node2D:
     nglob = 1
@@ -439,33 +509,5 @@ def funHrs(r,s):
     return hrs
 
 # @profile
-def Assemble(elem,Ke,K,brhs):
-    '''
-    elem: Objeto elemento
-    Ke: Matriz de rigidez local a ensamblar en global
-    K: Matriz global
-    gl: grado de libertad = nnodos x 2, es el indice de la K global
-    '''
 
-    row = [(x-1)*2+y for x in elem.localNodes() for y in [0,1]]
-    col = row
-    for i in range(9):
-        ni = elem.nloc[i].nglob-1
-        gl = ni*2
-        helprow = [ni,ni+1]
-        row[i*2:i*2+2]=[ni,ni+1]
-        if elem.nloc[i].DIRx and elem.nloc[i].DIRy :
-            K[gl,gl] = 1
-            K[gl+1,gl+1] = 1
-            brhs[gl] = elem.nloc[i].xValue
-            brhs[gl+1] = elem.nloc[i].yValue
-        else :
-            if elem.nloc[i].NEU:
-                brhs[gl] = elem.nloc[i].xForce
-                brhs[gl+1] = elem.nloc[i].yForce               
-        for j in range(9):
-            nj = elem.nloc[j].nglob-1
-            glj= nj*2
-            K[gl:gl+2,glj:glj+2] += Ke[i*2:i*2+2,j*2:j*2+2]
-    return K , brhs
 

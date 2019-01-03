@@ -3,10 +3,6 @@ import scipy.sparse as sp
 from gmshtools import readGmshFile
 import numpy as np
 
-def searchElem(line,nElemLocal,listElements):
-
-    pass
-
 def Constructor(entity,inpGmsh,cNodes,bc=False):
     '''
     entity: Entidad para extraer datos de malla, puede ser $Nodes o $Elements
@@ -263,15 +259,35 @@ class FemProblem:
         self.bcNodes = bcNodes
 
     def setMatrix(self):
+        """[summary]
+            This function setups Empty K , brhs in all cases
+            H & Hrs depends on ElemType
+
+        Raises:
+            Exception -- [description]
+
+        Returns:
+            K[lil_matrix] -- Empty Global rigidity matrix
+            brhs[lil_matrix] -- Empty Right hand side vector
+            H[array] -- Array with form functions evaluated in gps
+            Hrs[array] -- It haves the derivatives in gps
+        """
+
+        ncols = (self.nnode)*2
+        nrows = (self.nnode)*2
+        self.K = sp.lil_matrix((nrows,ncols))
+        self.brhs = sp.lil_matrix((nrows,1))
+
         if self.elemType == 'Quad9':
             self.H = self.quad9H()
             self.Hrs = self.quad9Hrs()
-            ncols = (self.nnode)*2
-            nrows = (self.nnode)*2
-            self.K = sp.lil_matrix((nrows,ncols))
-            self.brhs = sp.lil_matrix((nrows,1))
+        
+        elif self.elemType == 'Quad4':
+            self.H = None
+            self.Hrs = None
+
         else:
-            raise Exception('No se definió ningún tipo de elemento')
+            raise Exception('Invalid elemType defined you must use Quad4 or Quad9')
 
     def quad9H(self):
         gpoints = [-0.774,0, 0.774]

@@ -78,42 +78,6 @@ if len(conect[0].nloc) == 9:
 else:
         elemType = 'Quad4'
 
-
-        #Inicio de matriz global
-        K = sp.lil_matrix((nNodos*2,nNodos*2))
-        brhs = sp.lil_matrix((nNodos*2,1))
-
-        #Formato de cond de borde
-        bcList = [[0,0],[400,200]]
-
-        #Seteo de BC en nodos
-        for nodin in coord:
-                if nodin.BG:
-                        nodin.physGrouptoValue(bcList)
-
-        #Armado de matrices elementales y ensamblaje
-        for elem in conect:
-                Ke = elem.getKe(C)
-                K , brhs = Assemble(elem, Ke , K , brhs)
-
-        #Setup de matrices esparsas
-        K = K.tocsc()
-        brhs = brhs.tocsc()
-
-        #Resolucion
-        logging.info('Resolviendo...')
-        U = spsolve(K,brhs)
-        logging.info('Resuelto')
-        storeValuesToNodes(coord,U)
-
-        #Preparacion de Arrays para postproceso
-        conectivity = computeDomainStress(conect)
-        nodeCoordinates , nodeStress = createNodeData(coord)
-        U = U.reshape((nNodos,2))
-
-        #Escribir archivo .vtu para ver en Paraview
-        writeXML(nodeCoordinates, conectivity , U, sys.argv[1], nodeStress)
-
 fem = FemProblem(fileGmsh,nElem,nNodos,elemType,conect,bcNodes)
 
 t3 = datetime.now()

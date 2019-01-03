@@ -117,7 +117,7 @@ class Elem:
         pos = self.getpos()
         return Hrs[gps] * pos
     # @profile
-    def getKe(self,H,Hrs,C):
+    def getKe(self,H,Hrs,C,gpWei):
         dof = len(self.nloc)*2
         J = np.matrix(np.zeros((2,2)))
         Ke = np.matrix(np.zeros((dof,dof)))
@@ -126,7 +126,7 @@ class Elem:
             J = self.calcJacobian(i,Hrs)
             detJ = np.linalg.det(J)
             B = self.funB(Hrs[i],J)
-            Ke += B.T * C * B * detJ *10
+            Ke += B.T * C * B * detJ*gpWei[i]*10
             Be += B * detJ *10
         self.Bstress = Be
         return Ke
@@ -223,12 +223,15 @@ class FemProblem:
         '''
 
         He = []
+        gpWei = []
         for weir , gpr in enumerate(gpoints):
             for weis, gps in enumerate(gpoints):
                 gprWei = gpweights[weir]
                 gpsWei = gpweights[weis]
-                dHrs = formFunction(gpr,gps)*gprWei*gpsWei
+                dHrs = formFunction(gpr,gps)
+                gpWei.append(gprWei*gpsWei)
                 He.append(dHrs)
+        self.gpWei = gpWei
         return He
 
     def funH4(self,r,s):
@@ -329,7 +332,7 @@ class FemProblem:
         forceX = 50
         forceY = 0
         for elem in self.conectivity:
-            Ke = elem.getKe(self.H,self.Hrs,C)
+            Ke = elem.getKe(self.H,self.Hrs,C,self.gpWei)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
             rowap , colap , Kelemap = self.getRowData(elem,Ke)
             row.extend(rowap)

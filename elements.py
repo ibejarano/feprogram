@@ -82,19 +82,6 @@ class Elem:
             initList.append(self.nloc[i].nglob)
         return initList
 
-    def Cmat(self):
-        nu = 0.3
-        E = 200
-        mat = np.zeros((3,3))
-        auxlist = [[1,nu,0],[nu,1,0],[0,0,(1-nu)*0.5]]
-        ind = 0
-        for i in auxlist:
-            mat[ind] = i
-            ind +=1
-        const = E / (1- nu**2)
-        return mat*const
-
-
     def funB(self,dHrs,J):
         dof = len(self.nloc)*2
         B = np.matrix(np.zeros((3,dof)))
@@ -177,7 +164,7 @@ class FemProblem:
             H[array] -- Array with form functions evaluated in gps
             Hrs[array] -- It haves the derivatives in gps
         """
-
+        self.C = self.Cmat()
         ncols = (self.nnode)*2
         nrows = (self.nnode)*2
         self.K = sp.lil_matrix((nrows,ncols))
@@ -323,7 +310,7 @@ class FemProblem:
         Kelem = Ke.ravel()
         return row , col , Kelem
 
-    def assemble(self, C):
+    def assemble(self):
         #Armado de matrices elementales y ensamblaje
         row = []
         col = []
@@ -331,7 +318,7 @@ class FemProblem:
         forceX = 50
         forceY = 0
         for elem in self.conectivity:
-            Ke = elem.getKe(self.H,self.Hrs,C,self.gpWei)
+            Ke = elem.getKe(self.H,self.Hrs,self.C,self.gpWei)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
             rowap , colap , Kelemap = self.getRowData(elem,Ke)
             row.extend(rowap)
@@ -387,6 +374,24 @@ class FemProblem:
 
             self.nodesDIR = nodesDirichlet
             self.nodesForce = nodesForce
+
+    def Cmat(self):
+        '''Calculates relation between stress-strains
+        
+        Returns:
+            C (array) -- matrix with relation
+        '''
+
+        nu = 0.3
+        E = 200
+        mat = np.zeros((3,3))
+        auxlist = [[1,nu,0],[nu,1,0],[0,0,(1-nu)*0.5]]
+        ind = 0
+        for i in auxlist:
+            mat[ind] = i
+            ind +=1
+        const = E / (1- nu**2)
+        return mat*const
 
 class Node2D:
     nglob = 1

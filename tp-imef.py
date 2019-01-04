@@ -43,12 +43,8 @@ nNodesBc , bcTupledNodes = Constructor('$Elements',fileGmsh,coord,bc=True)
 bcNodes = removeDuplicates(bcTupledNodes)
 nElem, conect = Constructor('$Elements',fileGmsh,coord)
 
-
 t2 = datetime.now()
 logging.info('Leer de Gmsh: %f sec', (t2 - t1).total_seconds())
-
-C = conect[0].Cmat()
-
 
 if len(conect[0].nloc) == 9:
         elemType = 'Quad9'
@@ -71,7 +67,7 @@ fem.setBoundaryConditions(coord)
 t5 = datetime.now()
 logging.info('Seteo de BC en nodos: %f sec', (t5 - t4).total_seconds())
 
-fem.assemble(C)
+fem.assemble()
 
 t6 = datetime.now()
 logging.info('Ensamblaje de matrices: %f sec', (t6 - t5).total_seconds())

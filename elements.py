@@ -282,9 +282,6 @@ class FemProblem:
 
         hr = [0]*9
         hs = [0]*9
-        for i in range(4):
-            hr[i] = 0.25*hrquad4[i] - 0.5*0.5*hrquad8[i] - 0.5*0.5*hrquad8[i-1] - 0.25*hrquad9
-            hs[i] = 0.25*hsquad4[i] - 0.5*0.5*hsquad8[i] - 0.5*0.5*hsquad8[i-1] - 0.25*hsquad9
 
         for i in range(4):
             hr[i+4] = 0.5*hrquad8[i] - 0.5*hrquad9
@@ -292,7 +289,14 @@ class FemProblem:
 
         hr[8] = hrquad9
         hs[8] = hsquad9
-
+        
+        for i in range(1,4):
+            hr[i] = 0.25*hrquad4[i] - 0.5*hr[i+4] - 0.5*hr[i+3] - 0.25*hrquad9
+            hs[i] = 0.25*hsquad4[i] - 0.5*hs[i+4] - 0.5*hs[i+3] - 0.25*hsquad9
+            
+        hr[0] = 0.25*hrquad4[0] - 0.5*hr[4] - 0.5*hr[7] - 0.25*hrquad9
+        hs[0] = 0.25*hsquad4[0] - 0.5*hs[4] - 0.5*hs[7] - 0.25*hsquad9
+        
         dhrs = np.matrix(np.zeros((2,9)))
 
         dhrs[0] = hr

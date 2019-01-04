@@ -100,9 +100,9 @@ class Elem:
         return np.matrix(auxlist)   
 
 
-    def calcJacobian(self,gps,Hrs):
+    def calcJacobian(self,Hrs):
         pos = self.getpos()
-        return Hrs[gps] * pos
+        return Hrs * pos
     # @profile
     def getKe(self,H,Hrs,C,gpWei):
         dof = len(self.nloc)*2
@@ -110,7 +110,7 @@ class Elem:
         Ke = np.matrix(np.zeros((dof,dof)))
         Be = np.matrix(np.zeros((3,dof)))
         for i in range(int(dof/2)):
-            J = self.calcJacobian(i,Hrs)
+            J = self.calcJacobian(Hrs[i])
             detJ = np.linalg.det(J)
             B = self.funB(Hrs[i],J)
             Ke += B.T * C * B * detJ*gpWei[i]*10
@@ -177,7 +177,7 @@ class FemProblem:
             self.Hrs = self.quadHrs(gpsList,self.funHrs9,gpsWei)
         
         elif self.elemType == 'Quad4':
-            gpsList = [-0.5777,0.5777]
+            gpsList = [-0.5773,0.5773]
             gpsWei = [1,1]
             self.H = self.quadH(gpsList,self.funH4,gpsWei)
             self.Hrs = self.quadHrs(gpsList,self.funHrs4,gpsWei)

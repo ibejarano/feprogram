@@ -71,100 +71,6 @@ def nodesAsign(tNodes,coordNodes):
         objNod.append(coordNodes[i-1])
     return objNod
 
-class ElemQ4:
-    def __init__(self,nodes):
-        self.nloc = nodes
-        self.H = self.buildMatrix()
-
-    def localNodes(self):
-        initList = []
-        for i in range(len(self.nloc)):
-            initList.append(self.nloc[i].nglob)
-        return initList
-
-    def Cmat(self):
-        nu = 0.3
-        E = 200
-        mat = np.zeros((3,3))
-        auxlist = [[1,nu,0],[nu,1,0],[0,0,(1-nu)*0.5]]
-        ind = 0
-        for i in auxlist:
-            mat[ind] = i
-            ind +=1
-        const = E / (1- nu**2)
-        return mat*const
-
-    def fundHrs(self,r,s):
-        hr=[1+s , -1-s , -1 +s ,1-s]
-        hs=[1+r,1-r , -1 +r , -1 -r]
-        dhrs = np.matrix(np.zeros((2,4)))
-        dhrs[0] = hr
-        dhrs[1] = hs
-        return dhrs*0.25
-
-    def funB(self,dHrs,J):
-        B = np.matrix(np.zeros((3,8)))
-        Jinv = np.linalg.inv(J)
-        DH = Jinv * dHrs
-        for i in range(2):
-            B[i,i::2] = DH[i]
-            B[2,i::2] = DH[i-1]
-        return B
-
-    def getpos(self):
-        auxlist = []
-        for i in range(4):
-            auxlist.append([self.nloc[i].x,self.nloc[i].y])
-        return np.matrix(auxlist)   
-
-    def buildMatrix(self):
-        gpoints = [-0.5773, 0.5773]
-        He = []
-        for gpr in gpoints:
-            for gps in gpoints:
-                dHrs = self.fundHrs(gpr,gps)
-                He.append(dHrs)
-        return He
-    
-    def calcJacobian(self,gps):
-        return self.H[gps] * self.getpos()
-
-    def getKe(self,C):
-        J = np.matrix(np.zeros((2,2)))
-        Ke = np.matrix(np.zeros((8,8)))
-        Be = np.matrix(np.zeros((3,8)))
-        for i in range(4):
-            J = self.calcJacobian(i)
-            detJ = np.linalg.det(J)
-            B = self.funB(self.H[i],J)
-            Ke += B.T * C * B * detJ *10
-            Be += B * detJ *10
-        self.Bstress = Be
-        return Ke
-
-    def getLocalDisplacement(self):
-        U = np.matrix(np.zeros((4,2)))
-        count = 0
-        for node in self.nloc:
-            U[count , 0] = node.xValue
-            U[count,1] = node.yValue
-            count+=1
-        U = U.reshape((8,1))
-        return U
-
-    def computeStress(self,C):
-        dH = self.fundHrs(0,0)
-        J = dH * self.getpos()
-        B = self.funB(dH,J)
-        U = self.getLocalDisplacement()
-        Stress = C * B * U
-        return Stress
-
-    def elemStressToNodes(self,stress):
-        for localNode in self.nloc:
-            localNode.storeStress(stress)
-        return 0
-
 class Elem:
     def __init__(self,nodes,elemType):
         self.elemType = elemType
@@ -175,19 +81,6 @@ class Elem:
         for i in range(len(self.nloc)):
             initList.append(self.nloc[i].nglob)
         return initList
-
-    def Cmat(self):
-        nu = 0.3
-        E = 200
-        mat = np.zeros((3,3))
-        auxlist = [[1,nu,0],[nu,1,0],[0,0,(1-nu)*0.5]]
-        ind = 0
-        for i in auxlist:
-            mat[ind] = i
-            ind +=1
-        const = E / (1- nu**2)
-        return mat*const
-
 
     def funB(self,dHrs,J):
         dof = len(self.nloc)*2
@@ -207,20 +100,20 @@ class Elem:
         return np.matrix(auxlist)   
 
 
-    def calcJacobian(self,gps,Hrs):
+    def calcJacobian(self,Hrs):
         pos = self.getpos()
-        return Hrs[gps] * pos
+        return Hrs * pos
     # @profile
-    def getKe(self,H,Hrs,C):
+    def getKe(self,H,Hrs,C,gpWei):
         dof = len(self.nloc)*2
         J = np.matrix(np.zeros((2,2)))
         Ke = np.matrix(np.zeros((dof,dof)))
         Be = np.matrix(np.zeros((3,dof)))
         for i in range(int(dof/2)):
-            J = self.calcJacobian(i,Hrs)
+            J = self.calcJacobian(Hrs[i])
             detJ = np.linalg.det(J)
             B = self.funB(Hrs[i],J)
-            Ke += B.T * C * B * detJ *10
+            Ke += B.T * C * B * detJ*gpWei[i]*10
             Be += B * detJ *10
         self.Bstress = Be
         return Ke
@@ -271,7 +164,7 @@ class FemProblem:
             H[array] -- Array with form functions evaluated in gps
             Hrs[array] -- It haves the derivatives in gps
         """
-
+        self.C = self.Cmat()
         ncols = (self.nnode)*2
         nrows = (self.nnode)*2
         self.K = sp.lil_matrix((nrows,ncols))
@@ -284,14 +177,13 @@ class FemProblem:
             self.Hrs = self.quadHrs(gpsList,self.funHrs9,gpsWei)
         
         elif self.elemType == 'Quad4':
-            gpsList = [-0.5777,0.5777]
+            gpsList = [-0.5773,0.5773]
             gpsWei = [1,1]
             self.H = self.quadH(gpsList,self.funH4,gpsWei)
             self.Hrs = self.quadHrs(gpsList,self.funHrs4,gpsWei)
 
         else:
             raise Exception('Invalid elemType defined you must use Quad4 or Quad9')
-
 
     def quadH(self,gpoints,formFunction,gpweights=None):
         H = []
@@ -317,12 +209,15 @@ class FemProblem:
         '''
 
         He = []
+        gpWei = []
         for weir , gpr in enumerate(gpoints):
             for weis, gps in enumerate(gpoints):
                 gprWei = gpweights[weir]
                 gpsWei = gpweights[weis]
-                dHrs = formFunction(gpr,gps)*gprWei*gpsWei
+                dHrs = formFunction(gpr,gps)
+                gpWei.append(gprWei*gpsWei)
                 He.append(dHrs)
+        self.gpWei = gpWei
         return He
 
     def funH4(self,r,s):
@@ -340,7 +235,7 @@ class FemProblem:
         return H
 
     def funH9(self,r,s):
-        r_power = 1- r**2
+        r_power = 1-r**2
         s_power = 1-s**2
         r_plus = 1+r
         r_minus = 1-r
@@ -379,17 +274,14 @@ class FemProblem:
 
     def funHrs9(self,r,s):
         hrquad4 = [1+s , -1-s , -1 +s ,1-s]
-        hrquad8 = [-r*(1+s),-0.5*(1-s**2),-r*(1-s),0.5*(1-s**2)]
+        hrquad8 = [-2*r*(1+s),-1*(1-s**2),-2*r*(1-s),(1-s**2)]
         hrquad9 = -2*r*(1-s**2)
-        hsquad4 = [1+r,1-r , -1 +r , -1 -r]
-        hsquad8 = [0.5*(1-r**2),-s*(1-r),-0.5*(1-r**2),-s*(1+r)]
-        hsquad9 = -2*r*(1-r**2)
+        hsquad4 = [1+r,1-r ,-1+r ,-1-r]
+        hsquad8 = [(1-r**2),-2*s*(1-r),-1*(1-r**2),-2*s*(1+r)]
+        hsquad9 = -2*s*(1-r**2)
 
         hr = [0]*9
         hs = [0]*9
-        for i in range(4):
-            hr[i] = 0.25*hrquad4[i] - 0.25*hrquad8[i] - 0.25*hrquad8[i-1] - 0.25*hrquad9
-            hs[i] = 0.25*hsquad4[i] - 0.25*hsquad8[i] - 0.25*hsquad8[i-1] - 0.25*hsquad9
 
         for i in range(4):
             hr[i+4] = 0.5*hrquad8[i] - 0.5*hrquad9
@@ -397,7 +289,14 @@ class FemProblem:
 
         hr[8] = hrquad9
         hs[8] = hsquad9
-
+        
+        for i in range(1,4):
+            hr[i] = 0.25*hrquad4[i] - 0.5*hr[i+4] - 0.5*hr[i+3] - 0.25*hrquad9
+            hs[i] = 0.25*hsquad4[i] - 0.5*hs[i+4] - 0.5*hs[i+3] - 0.25*hsquad9
+            
+        hr[0] = 0.25*hrquad4[0] - 0.5*hr[4] - 0.5*hr[7] - 0.25*hrquad9
+        hs[0] = 0.25*hsquad4[0] - 0.5*hs[4] - 0.5*hs[7] - 0.25*hsquad9
+        
         dhrs = np.matrix(np.zeros((2,9)))
 
         dhrs[0] = hr
@@ -415,7 +314,7 @@ class FemProblem:
         Kelem = Ke.ravel()
         return row , col , Kelem
 
-    def assemble(self, C):
+    def assemble(self):
         #Armado de matrices elementales y ensamblaje
         row = []
         col = []
@@ -423,7 +322,7 @@ class FemProblem:
         forceX = 50
         forceY = 0
         for elem in self.conectivity:
-            Ke = elem.getKe(self.H,self.Hrs,C)
+            Ke = elem.getKe(self.H,self.Hrs,self.C,self.gpWei)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
             rowap , colap , Kelemap = self.getRowData(elem,Ke)
             row.extend(rowap)
@@ -461,7 +360,6 @@ class FemProblem:
 
         self.K = self.K.tocsc()
         self.brhs = self.brhs.tocsc()
-        return None
 
     def setBoundaryConditions(self, coords):
             '''
@@ -481,7 +379,23 @@ class FemProblem:
             self.nodesDIR = nodesDirichlet
             self.nodesForce = nodesForce
 
-            return None
+    def Cmat(self):
+        '''Calculates relation between stress-strains
+        
+        Returns:
+            C (array) -- matrix with relation
+        '''
+
+        nu = 0.3
+        E = 200
+        mat = np.zeros((3,3))
+        auxlist = [[1,nu,0],[nu,1,0],[0,0,(1-nu)*0.5]]
+        ind = 0
+        for i in auxlist:
+            mat[ind] = i
+            ind +=1
+        const = E / (1- nu**2)
+        return mat*const
 
 class Node2D:
     nglob = 1

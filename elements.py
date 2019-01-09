@@ -415,21 +415,6 @@ class Node2D:
         self.BG = True
         self.bcGroup = group
 
-    def setNEUx(self,bc):
-        self.NEU = True
-        self.xForce = bc
-
-    def setNEUy(self,bc):
-        self.yForce = bc
-
-    def setDIRxValue(self,value):
-        self.DIRx = True
-        self.xValue = value
-
-    def setDIRyValue(self,value):
-        self.DIRy = True
-        self.yValue = value
-
     def storeCalcValue(self,xValue,yValue):
         self.xValue = xValue
         self.yValue = yValue
@@ -438,30 +423,6 @@ class Node2D:
         for i in range(3):
             self.stress[i] = (stressVector[0,i] + self.stress[i]) / (self.markStress+1) - self.stress[i]/(self.markStress)
         self.markStress += 1
-
-    def physGrouptoValue(self,bclist):
-        '''
-        Pasar los numeros del phys group a un valor
-        '''
-        group = self.bcGroup - 1
-        pairValue = bclist[group]
-        aux = 0
-        for bc in pairValue:
-            if group == 0:
-                if aux ==0:
-                    self.setDIRxValue(bc)
-                else:
-                    self.setDIRyValue(bc)
-            else:
-                if aux ==0:
-                    self.setNEUx(bc)                  
-                else:
-                    self.setNEUy(bc)
-            aux += 1
-
-def funHrs(r,s):
-    #FIXME: FUNCION NO IMPLEMENTADA, CONTIENE LAS FUNCIONES DE INTERPOLACION
-    pass
 
 # @profile
 

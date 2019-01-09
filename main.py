@@ -53,7 +53,7 @@ else:
         elemType = 'Quad4'
         elemNodes = 4
 
-fem = FemProblem(fileGmsh,nElem,nNodos,elemType,conect,bcNodes)
+fem = FemProblem(nElem,nNodos,elemType,conect,bcNodes)
 
 t3 = datetime.now()
 logging.info('Crear elemento fem: %f sec', (t3 - t2).total_seconds())

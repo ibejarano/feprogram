@@ -143,7 +143,18 @@ class Elem:
         return 0
 
 class FemProblem:
-    def __init__(self,meshName,nelem,nnode,elemType,conectivity,bcNodes):
+    def __init__(self,nelem,nnode,elemType,conectivity,bcNodes):
+        '''Instance the FEM problem, the code get around this class
+        
+        Arguments:
+            meshName {string} -- name of mesh, DEPRECATED
+            nelem {integer} -- total element number of problem
+            nnode {integer} -- total node number of problem
+            elemType {string} -- declares if type is quad9 or quad4
+            conectivity {array} -- contains objects class Elem
+            bcNodes {array} -- contains a list with nodes with boundary conditions
+        '''
+
         self.nelem = nelem
         self.nnode = nnode
         self.elemType = elemType
@@ -156,7 +167,7 @@ class FemProblem:
             H & Hrs depends on ElemType
 
         Raises:
-            Exception -- [description]
+            Exception -- if no elemType defined nor implemented yet
 
         Returns:
             K[lil_matrix] -- Empty Global rigidity matrix
@@ -186,6 +197,19 @@ class FemProblem:
             raise Exception('Invalid elemType defined you must use Quad4 or Quad9')
 
     def quadH(self,gpoints,formFunction,gpweights=None):
+        '''Build the H matrix with the formfunctions and evaluates at gauss points and weights if its needed
+        
+        Arguments:
+            gpoints {list} -- list containing iterable points
+            formFunction {callback} -- function that returns the value of form functions at gauss point
+        
+        Keyword Arguments:
+            gpweights {list} -- weights of numerical integration, only needed when elemType=Quad9 (default: {None})
+        
+        Returns:
+            array -- The columns are hi form function and row are gauss points number
+        '''
+
         H = []
         for gpr in gpoints:
             for gps in gpoints:
@@ -335,7 +359,6 @@ class FemProblem:
 
         indexList = []
 
-        #FIXME : This has to be done only in DIR nodes!
         for dirInd in self.nodesDIR:
             i = (dirInd-1)*2
             k = i+1
@@ -425,5 +448,3 @@ class Node2D:
         self.markStress += 1
 
 # @profile
-
-

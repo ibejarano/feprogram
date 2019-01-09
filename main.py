@@ -48,8 +48,10 @@ logging.info('Leer de Gmsh: %f sec', (t2 - t1).total_seconds())
 
 if len(conect[0].nloc) == 9:
         elemType = 'Quad9'
+        elemNodes = 9
 else:
         elemType = 'Quad4'
+        elemNodes = 4
 
 fem = FemProblem(fileGmsh,nElem,nNodos,elemType,conect,bcNodes)
 
@@ -82,14 +84,14 @@ nodeCoordinates , nodeStress = createNodeData(coord)
 U = U.reshape((nNodos,2))
 
 
-conectivity_xml = np.zeros((len(conect),len(conect[0].nloc)))
+conectivity_xml = np.zeros((nElem,elemNodes))
+
 for ind , local in enumerate(conect):
         conectivity_xml[ind] = local.localNodes()
 
 #Escribir archivo .vtu para ver en Paraview
 writeXML(nodeCoordinates, conectivity_xml , U, sys.argv[1], nodeStress)
 
-
-t3 = datetime.now()
-logging.info('Tiempo total: %f sec', (t3 - t1).total_seconds())
+t8 = datetime.now()
+logging.info('Tiempo total: %f sec', (t8 - t1).total_seconds())
 

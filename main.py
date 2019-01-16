@@ -84,7 +84,7 @@ nodeCoordinates , nodeStress = createNodeData(coord)
 U = U.reshape((nNodos,2))
 
 
-conectivity_xml = np.zeros((nElem,elemNodes))
+conectivity_xml = np.zeros((len(conect),elemNodes))
 
 for ind , local in enumerate(conect):
         conectivity_xml[ind] = local.localNodes()

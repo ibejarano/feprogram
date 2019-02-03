@@ -343,7 +343,7 @@ class FemProblem:
         row = []
         col = []
         Kelem = []
-        forceX = 50
+        forceX = 1
         forceY = 0
         for elem in self.conectivity:
             Ke = elem.getKe(self.H,self.Hrs,self.C,self.gpWei)
@@ -386,7 +386,7 @@ class FemProblem:
 
     def setBoundaryConditions(self, coords):
             '''
-            it only receives a tuple with nodes and assing only forces and construct brhs from element
+            it only receives a tuple with nodes and assign only forces and construct brhs from element
             '''
             #the first One is Dirichlet and its meant to be K = 1 in that index
             #if NEU brhs equals force

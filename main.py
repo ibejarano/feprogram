@@ -3,7 +3,7 @@ import numpy as np
 import scipy.sparse as sp
 import sys
 import logging
-from gmshtools import readGmshFile
+from gmshtools import readGmshFile , writeGmshOut
 from scipy.sparse.linalg import spsolve
 from elements import Node2D , Constructor , FemProblem
 from datetime import datetime
@@ -90,7 +90,9 @@ for ind , local in enumerate(conect):
         conectivity_xml[ind] = local.localNodes()
 
 #Escribir archivo .vtu para ver en Paraview
-writeXML(nodeCoordinates, conectivity_xml , U, sys.argv[1], nodeStress)
+#writeXML(nodeCoordinates, conectivity_xml , U, sys.argv[1], nodeStress)
+
+writeGmshOut(fileGmsh)
 
 t8 = datetime.now()
 logging.info('Tiempo total: %f sec', (t8 - t1).total_seconds())

@@ -1,3 +1,4 @@
+import shutil
 
 def searchline(palabra, f ):
     print("Buscando: ",palabra)
@@ -28,3 +29,12 @@ def readGmshFile(word,inpGmsh):
     lines = fileGmsh.readline()
     nitems = int(lines.split()[0])
     return nitems , fileGmsh
+
+def writeGmshOut(inputGmsh):
+    """A Function to write the output proccessing file
+    
+    Arguments:
+        inputGmsh {string} -- Only a string with the name of gmsh
+    """
+    outputGmsh = 'Out'+inputGmsh
+    shutil.copyfile(inputGmsh,outputGmsh)

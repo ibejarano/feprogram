@@ -30,11 +30,22 @@ def readGmshFile(word,inpGmsh):
     nitems = int(lines.split()[0])
     return nitems , fileGmsh
 
-def writeGmshOut(inputGmsh):
+def writeGmshOut(inputGmsh,U):
     """A Function to write the output proccessing file
     
     Arguments:
         inputGmsh {string} -- Only a string with the name of gmsh
+        U {array} --          Displacement array vector
     """
+    dim = 2
+    nNodes = len(U)
     outputGmsh = 'Out'+inputGmsh
     shutil.copyfile(inputGmsh,outputGmsh)
+    fOut = open(outputGmsh,'a')
+    fOut.write( '$NodeData\n1\n"Displacement [mm]"\n1\n0\n3\n0\n3\n')
+    fOut.write('{} \n'.format(nNodes))
+    counter = 1
+    for displacement in U:
+        fOut.write('{} {} {} 0\n'.format(counter,displacement[0],displacement[1]))
+        counter+=1
+    fOut.write('$EndNodeData')

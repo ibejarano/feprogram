@@ -92,7 +92,7 @@ for ind , local in enumerate(conect):
 #Escribir archivo .vtu para ver en Paraview
 #writeXML(nodeCoordinates, conectivity_xml , U, sys.argv[1], nodeStress)
 
-writeGmshOut(fileGmsh)
+writeGmshOut(fileGmsh,U)
 
 t8 = datetime.now()
 logging.info('Tiempo total: %f sec', (t8 - t1).total_seconds())

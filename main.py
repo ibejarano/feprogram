@@ -80,7 +80,7 @@ t7 = datetime.now()
 logging.info('Calculo de desplazamientos: %f sec', (t7 - t6).total_seconds())
 
 storeValuesToNodes(coord,U)
-fem.getStress()
+vonMisesStress = fem.getStress()
 nodeCoordinates , nodeStress = createNodeData(coord)
 U = U.reshape((nNodos,2))
 
@@ -92,8 +92,8 @@ for ind , local in enumerate(conect):
 
 #Escribir archivo .vtu para ver en Paraview
 #writeXML(nodeCoordinates, conectivity_xml , U, sys.argv[1], nodeStress)
-
-writeGmshOut(fileGmsh,U)
+elemSkip = len(bcTupledNodes)+1
+writeGmshOut(fileGmsh,U,vonMisesStress,elemSkip)
 
 t8 = datetime.now()
 logging.info('Tiempo total: %f sec', (t8 - t1).total_seconds())

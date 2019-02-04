@@ -30,7 +30,7 @@ def readGmshFile(word,inpGmsh):
     nitems = int(lines.split()[0])
     return nitems , fileGmsh
 
-def writeGmshOut(inputGmsh,U):
+def writeGmshOut(inputGmsh,U,Stress,startElem):
     """A Function to write the output proccessing file
     
     Arguments:
@@ -39,6 +39,7 @@ def writeGmshOut(inputGmsh,U):
     """
     dim = 2
     nNodes = len(U)
+    nElement = len(Stress)
     outputGmsh = 'Out'+inputGmsh
     shutil.copyfile(inputGmsh,outputGmsh)
     fOut = open(outputGmsh,'a')
@@ -48,4 +49,12 @@ def writeGmshOut(inputGmsh,U):
     for displacement in U:
         fOut.write('{} {} {} 0\n'.format(counter,displacement[0],displacement[1]))
         counter+=1
-    fOut.write('$EndNodeData')
+    fOut.write('$EndNodeData\n')
+    #Start writing element data
+    fOut.write( '$ElementData\n1\n"Stress [MPa]"\n1\n0\n3\n0\n1\n')
+    fOut.write('{} \n'.format(nElement))
+    counter = startElem
+    for vonMises in Stress:
+        fOut.write('{} {}\n'.format(counter, vonMises))
+        counter+=1
+    fOut.write('$EndElementData')

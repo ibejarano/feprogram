@@ -2,6 +2,7 @@
 import scipy.sparse as sp
 from gmshtools import readGmshFile
 import numpy as np
+import math
 
 def Constructor(entity,inpGmsh,cNodes,bc=False):
     '''
@@ -130,7 +131,7 @@ class Elem:
         return U
 
     def computeStress(self,C,Hrs):
-        dH = Hrs
+        dH = Hrs[-1]
         J = dH * self.getpos()
         B = self.funB(dH,J)
         U = self.getLocalDisplacement()
@@ -419,6 +420,15 @@ class FemProblem:
             ind +=1
         const = E / (1- nu**2)
         return mat*const
+
+    def getStress(self):
+        listStress = []
+        C = self.C
+        for elem in self.conectivity:
+            localStress = elem.computeStress(C,self.Hrs)
+            vonMises = math.sqrt(localStress[0]**2 + localStress[1]**2 - localStress[0]*localStress[1] + 3*localStress[2]**2)
+            listStress.append(vonMises)
+        return listStress
 
 class Node2D:
     nglob = 1

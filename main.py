@@ -80,6 +80,7 @@ t7 = datetime.now()
 logging.info('Calculo de desplazamientos: %f sec', (t7 - t6).total_seconds())
 
 storeValuesToNodes(coord,U)
+fem.getStress()
 nodeCoordinates , nodeStress = createNodeData(coord)
 U = U.reshape((nNodos,2))
 

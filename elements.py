@@ -24,30 +24,6 @@ class Elem:
             auxlist.append([coordinates[node,0],coordinates[node,1]])
         return np.matrix(auxlist)
 
-    def getLocalDisplacement(self):
-        numNodos = len(self.nloc)
-        U = np.matrix(np.zeros((numNodos,2)))
-        count = 0
-        for node in self.nloc:
-            U[count , 0] = node.xValue
-            U[count,1] = node.yValue
-            count+=1
-        U.reshape((numNodos*2,1))
-        return U
-
-    def computeStress(self,C,Hrs):
-        dH = Hrs
-        J = dH * self.getpos()
-        B = self.funB(dH,J)
-        U = self.getLocalDisplacement()
-        Stress = C * B * U
-        return Stress
-
-    def elemStressToNodes(self,stress):
-        for localNode in self.nloc:
-            localNode.storeStress(stress)
-        return 0
-
 class FemProblem:
     def __init__(self,conectivity, coordinates):
         '''Instance the FEM problem, the code get around this class

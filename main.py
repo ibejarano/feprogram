@@ -4,20 +4,10 @@ import scipy.sparse as sp
 import sys
 import logging
 from scipy.sparse.linalg import spsolve
-from elements import Node2D , FemProblem
+from elements import FemProblem
 from datetime import datetime
 from python_to_xml import writeXML , writeXML_nodeData
 from gmsh_api import getMeshInfo
-
-def storeValuesToNodes(nodeArray,values):
-        '''
-        Solo almacena los desplazamientos calculados en los nodos
-        '''
-        nNodos = len(nodeArray)
-        values = U.reshape(nNodos,2)
-        for i in range(nNodos):
-                nodeArray[i].storeCalcValue(values[i,0],values[i,1])
-        return None
 
 t1 = datetime.now()
 logging.basicConfig(level='INFO')

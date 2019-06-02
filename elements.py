@@ -21,7 +21,6 @@ class Elem:
 
     def getpos(self, nodesTagList, coordinates):
         auxlist = []
-<<<<<<< HEAD
         nNodeslocal = len(self.nloc)
         for i in range(nNodeslocal):
             auxlist.append([self.nloc[i].x,self.nloc[i].y])
@@ -69,11 +68,6 @@ class Elem:
         for localNode in self.nloc:
             localNode.storeStress(stress)
         return 0
-=======
-        for node in nodesTagList:
-            auxlist.append([coordinates[node,0],coordinates[node,1]])
-        return np.matrix(auxlist)
->>>>>>> feature-meshReader
 
 class FemProblem:
     def __init__(self,conectivity, coordinates):

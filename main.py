@@ -42,16 +42,11 @@ U = spsolve(fem.K,fem.brhs)
 t7 = datetime.now()
 logging.info('Calculo de desplazamientos: %f sec', (t7 - t6).total_seconds())
 
-<<<<<<< HEAD
 storeValuesToNodes(coord,U)
 vonMisesStress = fem.getStress()
 nodeCoordinates , nodeStress = createNodeData(coord)
 U = U.reshape((nNodos,2))
 
-=======
-#nodeCoordinates , nodeStress = createNodeData(coordinates)
-U = U.reshape((coordinates.shape[0],2))
->>>>>>> feature-meshReader
 
 #conectivity_xml = np.zeros((len(conectivity),elemNodes))
 
@@ -59,13 +54,9 @@ U = U.reshape((coordinates.shape[0],2))
         #conectivity_xml[ind] = local.localNodes()
 
 #Escribir archivo .vtu para ver en Paraview
-<<<<<<< HEAD
 #writeXML(nodeCoordinates, conectivity_xml , U, sys.argv[1], nodeStress)
 elemSkip = len(bcTupledNodes)+1
 writeGmshOut(fileGmsh,U,vonMisesStress,elemSkip)
-=======
-writeXML_nodeData(coordinates, conectivity , U, sys.argv[1])
->>>>>>> feature-meshReader
 
 t8 = datetime.now()
 logging.info('Tiempo total: %f sec', (t8 - t1).total_seconds())

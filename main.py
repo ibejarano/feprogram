@@ -36,15 +36,14 @@ def removeDuplicates(tupledNodes):
 
 t1 = datetime.now()
 logging.basicConfig(level='INFO')
-coordinates , conectivity = getMeshInfo()
+coordinates , conectivity, bcNodeTags = getMeshInfo()
 
-fileGmsh = sys.argv[1]
+#bcNodeTags[0] = Borde inferior
+#bcNodeTags[1] = Borde derecho
+#bcNodeTags[2] = Borde superior
+#bcNodeTags[3] = Borde izquierdo
 
-#FIXME : Hacer la parte que lea las physical groups
-#nNodesBc , bcTupledNodes
-#bcNodes = removeDuplicates(bcTupledNodes)
-
-nNodos = coordinates.shape[0]
+nNodes = coordinates.shape[0]
 nElem = conectivity.shape[0]
 
 t2 = datetime.now()
@@ -53,7 +52,7 @@ logging.info('Leer de Gmsh: %f sec', (t2 - t1).total_seconds())
 elemType = 'Quad4'
 elemNodes = 4
 
-fem = FemProblem(nElem,nNodos,elemType,conectivity,bcNodes)
+fem = FemProblem(nElem,nNodes,elemType,conectivity, bcNodeTags)
 
 t3 = datetime.now()
 logging.info('Crear elemento fem: %f sec', (t3 - t2).total_seconds())

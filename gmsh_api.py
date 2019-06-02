@@ -57,12 +57,22 @@ def getMeshInfo():
     # phsyical volumes) followed by a vector of entity tags. The last (optional)
     # argument is the tag of the new group to create.
     gmsh.model.addPhysicalGroup(0, [1, 2], 1)
-    gmsh.model.addPhysicalGroup(1, [1, 2], 2)
+    #Lines
+    gmsh.model.addPhysicalGroup(1, [1], 2)
+    gmsh.model.addPhysicalGroup(1, [2], 3)
+    gmsh.model.addPhysicalGroup(1, [3], 4)
+    gmsh.model.addPhysicalGroup(1, [4], 5)
+    #interior
     gmsh.model.addPhysicalGroup(2, [1], 6)
 
     # Physical names are also defined by providing the dimension and tag of the
     # entity.
-    gmsh.model.setPhysicalName(2, 6, "My surface")
+    gmsh.model.setPhysicalName(1, 2, "Bottom")
+    gmsh.model.setPhysicalName(1, 3, "Right")
+    gmsh.model.setPhysicalName(1, 4, "Top")
+    gmsh.model.setPhysicalName(1, 5, "Left")
+
+    gmsh.model.setPhysicalName(2, 6, "Interior")
 
     # Before it can be meshed, the internal CAD representation must be synchronized
     # with the Gmsh model, which will create the relevant Gmsh data structures. This
@@ -78,7 +88,19 @@ def getMeshInfo():
 
     # ... and save it to disk
     gmsh.write("tp-EFAF.msh")
-
+    entities = gmsh.model.getEntities()
+    bcNodesList = list()
+    for side in range(1,5):
+        # get the mesh nodes for each elementary entity
+        nodeTags, nodeCoords, nodeParams = gmsh.model.mesh.getNodes(1, side)
+        # get the mesh elements for each elementary entity
+        elemTypes, elemTags, elemNodeTags = gmsh.model.mesh.getElements(1, side)
+        # report some statistics
+        numElem = sum(len(i) for i in elemTags)
+        print(str(len(nodeTags)) + " mesh nodes and " + str(numElem),\
+            "mesh elements on entity " + str(1) + " of type " + gmsh.model.getType(1, side))
+        partitions = gmsh.model.getPartitions(1, side)
+        bcNodesList.append(set(elemNodeTags[0]))
     _ , elemTags, _ = gmsh.model.mesh.getElements(2,1)
     nodeTags, nodeCoords, _ = gmsh.model.mesh.getNodes()
     coords = np.zeros((len(nodeTags),2))
@@ -87,4 +109,7 @@ def getMeshInfo():
     # This should be called at the end:
     gmsh.finalize()
 
-    return elemTags[0], coords
+    return elemTags[0], coords, bcNodesList
+
+if __name__ == '__main__':
+    a,b = getMeshInfo()

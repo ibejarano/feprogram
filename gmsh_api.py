@@ -88,20 +88,21 @@ def getMeshInfo():
 
     # ... and save it to disk
     gmsh.write("tp-EFAF.msh")
-    entities = gmsh.model.getEntities()
     bcNodesList = list()
     for side in range(1,5):
         # get the mesh nodes for each elementary entity
-        nodeTags, nodeCoords, nodeParams = gmsh.model.mesh.getNodes(1, side)
+        nodeTags, nodeCoords, _ = gmsh.model.mesh.getNodes(1, side)
         # get the mesh elements for each elementary entity
-        elemTypes, elemTags, elemNodeTags = gmsh.model.mesh.getElements(1, side)
+        _, elemTags, elemNodeTags = gmsh.model.mesh.getElements(1, side)
         # report some statistics
-        numElem = sum(len(i) for i in elemTags)
-        print(str(len(nodeTags)) + " mesh nodes and " + str(numElem),\
-            "mesh elements on entity " + str(1) + " of type " + gmsh.model.getType(1, side))
-        partitions = gmsh.model.getPartitions(1, side)
         bcNodesList.append(set(elemNodeTags[0]))
+
     _ , elemTags, _ = gmsh.model.mesh.getElements(2,1)
+    conectivity = list()
+    for elem in elemTags[0]:
+        cone = gmsh.model.mesh.getElement(elem)[1]
+        conectivity.append(cone)
+
     nodeTags, nodeCoords, _ = gmsh.model.mesh.getNodes()
     coords = np.zeros((len(nodeTags),2))
     coords[:,0] = nodeCoords[0::3]
@@ -109,7 +110,8 @@ def getMeshInfo():
     # This should be called at the end:
     gmsh.finalize()
 
-    return elemTags[0], coords, bcNodesList
+    return conectivity, coords, bcNodesList
 
 if __name__ == '__main__':
-    a,b = getMeshInfo()
+    a, b, c = getMeshInfo()
+    print(a[0])

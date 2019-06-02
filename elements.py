@@ -2,29 +2,14 @@
 import scipy.sparse as sp
 import numpy as np
 
-def nodesAsign(tNodes,coordNodes):
-    '''
-    tNodes: Tupla con los nodos enteros
-    tobj: Tupla con los objetos nodos
-    '''
-    objNod = []
-    for i in tNodes:
-        objNod.append(coordNodes[i-1])
-    return objNod
-
 class Elem:
     def __init__(self,nodes,elemType):
         self.elemType = elemType
-        self.nloc = nodes
-
-    def localNodes(self):
-        initList = []
-        for i in range(len(self.nloc)):
-            initList.append(self.nloc[i].nglob)
-        return initList
+        self.nnodesloc = nodes
+        #self.nloc = nodes (This are ojects)
 
     def funB(self,dHrs,J):
-        dof = len(self.nloc)*2
+        dof = self.nnodesloc*2
         B = np.matrix(np.zeros((3,dof)))
         Jinv = np.linalg.inv(J)
         Dh = Jinv * dHrs
@@ -33,31 +18,11 @@ class Elem:
             B[2,i::2] = Dh[i-1]
         return B
 
-    def getpos(self):
+    def getpos(self, nodesTagList, coordinates):
         auxlist = []
-        nNodeslocal = len(self.nloc)
-        for i in range(nNodeslocal):
-            auxlist.append([self.nloc[i].x,self.nloc[i].y])
-        return np.matrix(auxlist)   
-
-
-    def calcJacobian(self,Hrs):
-        pos = self.getpos()
-        return Hrs * pos
-    # @profile
-    def getKe(self,H,Hrs,C,gpWei):
-        dof = len(self.nloc)*2
-        J = np.matrix(np.zeros((2,2)))
-        Ke = np.matrix(np.zeros((dof,dof)))
-        Be = np.matrix(np.zeros((3,dof)))
-        for i in range(int(dof/2)):
-            J = self.calcJacobian(Hrs[i])
-            detJ = np.linalg.det(J)
-            B = self.funB(Hrs[i],J)
-            Ke += B.T * C * B * detJ*gpWei[i]*10
-            Be += B * detJ *10
-        self.Bstress = Be
-        return Ke
+        for node in nodesTagList:
+            auxlist.append([coordinates[node,0],coordinates[node,1]])
+        return np.matrix(auxlist)
 
     def getLocalDisplacement(self):
         numNodos = len(self.nloc)
@@ -84,7 +49,7 @@ class Elem:
         return 0
 
 class FemProblem:
-    def __init__(self,nelem,nnode,elemType,conectivity,bcNodes):
+    def __init__(self,conectivity, coordinates):
         '''Instance the FEM problem, the code get around this class
         
         Arguments:
@@ -95,12 +60,13 @@ class FemProblem:
             conectivity {array} -- contains objects class Elem
             bcNodes {array} -- contains a list with nodes with boundary conditions
         '''
+        self.nnode = coordinates.shape[0]
+        self.nelem = len(conectivity)
 
-        self.nelem = nelem
-        self.nnode = nnode
-        self.elemType = elemType
+        self.elem = Elem(4,'Quad4') if len(conectivity[0])==4 else Elem(9,'Quad9')
+
         self.conectivity = conectivity
-        self.bcNodes = bcNodes
+        self.coordinates = coordinates
 
     def setMatrix(self):
         """[summary]
@@ -122,13 +88,13 @@ class FemProblem:
         self.K = sp.lil_matrix((nrows,ncols))
         self.brhs = sp.lil_matrix((nrows,1))
 
-        if self.elemType == 'Quad9':
+        if self.elem.elemType == 'Quad9':
             gpsList = [-0.774,0, 0.774]
             gpsWei = [0.55555 , 0.88888 , 0.55555]
             self.H = self.quadH(gpsList,self.funH9,gpsWei)
             self.Hrs = self.quadHrs(gpsList,self.funHrs9,gpsWei)
         
-        elif self.elemType == 'Quad4':
+        elif self.elem.elemType == 'Quad4':
             gpsList = [-0.5773,0.5773]
             gpsWei = [1,1]
             self.H = self.quadH(gpsList,self.funH4,gpsWei)
@@ -268,16 +234,31 @@ class FemProblem:
         dhrs[1] = hs
         return dhrs    
 
-    def getRowData(self,elem,Ke):
+    def getRowData(self,elemNodesTag,Ke):
         '''
         Optimized one
         '''
-        dof = len(elem.nloc)*2
-        listedNodes = [(x-1)*2+y for x in elem.localNodes() for y in [0,1]]
+        dof = len(elemNodesTag)*2
+        listedNodes = [(x-1)*2+y for x in elemNodesTag for y in [0,1]]
         col = listedNodes*dof
         row = [ind for ind in listedNodes for i in range(dof)]
         Kelem = Ke.ravel()
         return row , col , Kelem
+
+    def getKe(self, elemNodeTags):
+        dof = self.elem.nnodesloc*2
+        J = np.matrix(np.zeros((2,2)))
+        Ke = np.matrix(np.zeros((dof,dof)))
+        Be = np.matrix(np.zeros((3,dof)))
+        elemCorners = self.elem.getpos(elemNodeTags, self.coordinates)
+        for i in range(int(dof/2)):
+            J = self.Hrs[i] * elemCorners
+            detJ = np.linalg.det(J)
+            B = self.elem.funB(self.Hrs[i],J)
+            Ke += B.T * self.C * B * detJ*self.gpWei[i]*10
+            Be += B * detJ *10
+        self.Bstress = Be
+        return Ke
 
     def assemble(self):
         #Armado de matrices elementales y ensamblaje
@@ -287,7 +268,7 @@ class FemProblem:
         forceX = 1
         forceY = 0
         for elem in self.conectivity:
-            Ke = elem.getKe(self.H,self.Hrs,self.C,self.gpWei)
+            Ke = self.getKe(elem-1)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
             rowap , colap , Kelemap = self.getRowData(elem,Ke)
             row.extend(rowap)
@@ -301,7 +282,7 @@ class FemProblem:
         indexList = []
 
         for dirInd in self.nodesDIR:
-            i = (dirInd-1)*2
+            i = int((dirInd-1)*2)
             k = i+1
             _, J = self.K[i,:].nonzero()
             _, T = self.K[k,:].nonzero()
@@ -325,23 +306,29 @@ class FemProblem:
         self.K = self.K.tocsc()
         self.brhs = self.brhs.tocsc()
 
-    def setBoundaryConditions(self, coords):
+    def setBoundaryConditions(self, bcNodesList):
             '''
             it only receives a tuple with nodes and assign only forces and construct brhs from element
             '''
             #the first One is Dirichlet and its meant to be K = 1 in that index
             #if NEU brhs equals force
-            nodesDirichlet = []
-            nodesForce = []
-            for node in self.bcNodes:
-                if coords[node-1].bcGroup == 1:
-                    nodesDirichlet.append(node)
-                
-                else:
-                    nodesForce.append(node)
+            #bcNodeTags[0] = Borde inferior
+            #bcNodeTags[1] = Borde derecho
+            #bcNodeTags[2] = Borde superior
+            #bcNodeTags[3] = Borde izquierdo
 
-            self.nodesDIR = nodesDirichlet
-            self.nodesForce = nodesForce
+            dirichlet = [2,3]
+            neumann = [0,1]
+            dirNodes = set()
+            neuNodes = set()
+
+            for ind in dirichlet:
+                dirNodes.update(bcNodesList[ind])
+            for indNeu in neumann:
+                neuNodes.update(bcNodesList[indNeu] - dirNodes)
+
+            self.nodesDIR = list(dirNodes)
+            self.nodesForce = list(neuNodes)
 
     def Cmat(self):
         '''Calculates relation between stress-strains
@@ -360,32 +347,3 @@ class FemProblem:
             ind +=1
         const = E / (1- nu**2)
         return mat*const
-
-class Node2D:
-    nglob = 1
-    def __init__(self,coords):
-        self.x = coords[0]
-        self.y = coords[1]
-        self.DIRx = False
-        self.DIRy = False
-        self.NEU = False
-        self.nglob = self.nglob
-        self.BG = False
-        Node2D.nglob += 1
-        self.stress = [0,0,0]
-        self.markStress = 1
-
-    def setBG(self, group):
-        self.BG = True
-        self.bcGroup = group
-
-    def storeCalcValue(self,xValue,yValue):
-        self.xValue = xValue
-        self.yValue = yValue
-
-    def storeStress(self,stressVector):
-        for i in range(3):
-            self.stress[i] = (stressVector[0,i] + self.stress[i]) / (self.markStress+1) - self.stress[i]/(self.markStress)
-        self.markStress += 1
-
-# @profile

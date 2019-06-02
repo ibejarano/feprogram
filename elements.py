@@ -21,53 +21,9 @@ class Elem:
 
     def getpos(self, nodesTagList, coordinates):
         auxlist = []
-        nNodeslocal = len(self.nloc)
-        for i in range(nNodeslocal):
-            auxlist.append([self.nloc[i].x,self.nloc[i].y])
+        for node in nodesTagList:
+            auxlist.append([coordinates[node,0], coordinates[node,1]])
         return np.matrix(auxlist)   
-
-
-    def calcJacobian(self,Hrs):
-        pos = self.getpos()
-        return Hrs * pos
-    # @profile
-    def getKe(self,H,Hrs,C,gpWei):
-        dof = len(self.nloc)*2
-        J = np.matrix(np.zeros((2,2)))
-        Ke = np.matrix(np.zeros((dof,dof)))
-        Be = np.matrix(np.zeros((3,dof)))
-        for i in range(int(dof/2)):
-            J = self.calcJacobian(Hrs[i])
-            detJ = np.linalg.det(J)
-            B = self.funB(Hrs[i],J)
-            Ke += B.T * C * B * detJ*gpWei[i]*10
-            Be += B * detJ *10
-        self.Bstress = Be
-        return Ke
-
-    def getLocalDisplacement(self):
-        numNodos = len(self.nloc)
-        U = np.matrix(np.zeros((numNodos,2)))
-        count = 0
-        for node in self.nloc:
-            U[count , 0] = node.xValue
-            U[count,1] = node.yValue
-            count+=1
-        U = U.reshape((numNodos*2,1))
-        return U
-
-    def computeStress(self,C,Hrs):
-        dH = Hrs[-1]
-        J = dH * self.getpos()
-        B = self.funB(dH,J)
-        U = self.getLocalDisplacement()
-        Stress = C * B * U
-        return Stress
-
-    def elemStressToNodes(self,stress):
-        for localNode in self.nloc:
-            localNode.storeStress(stress)
-        return 0
 
 class FemProblem:
     def __init__(self,conectivity, coordinates):
@@ -367,46 +323,4 @@ class FemProblem:
             mat[ind] = i
             ind +=1
         const = E / (1- nu**2)
-<<<<<<< HEAD
         return mat*const
-
-    def getStress(self):
-        listStress = []
-        C = self.C
-        for elem in self.conectivity:
-            localStress = elem.computeStress(C,self.Hrs)
-            vonMises = math.sqrt(localStress[0]**2 + localStress[1]**2 - localStress[0]*localStress[1] + 3*localStress[2]**2)
-            listStress.append(vonMises)
-        return listStress
-
-class Node2D:
-    nglob = 1
-    def __init__(self,coords):
-        self.x = coords[0]
-        self.y = coords[1]
-        self.DIRx = False
-        self.DIRy = False
-        self.NEU = False
-        self.nglob = self.nglob
-        self.BG = False
-        Node2D.nglob += 1
-        self.stress = [0,0,0]
-        self.markStress = 1
-
-    def setBG(self, group):
-        self.BG = True
-        self.bcGroup = group
-
-    def storeCalcValue(self,xValue,yValue):
-        self.xValue = xValue
-        self.yValue = yValue
-
-    def storeStress(self,stressVector):
-        for i in range(3):
-            self.stress[i] = (stressVector[0,i] + self.stress[i]) / (self.markStress+1) - self.stress[i]/(self.markStress)
-        self.markStress += 1
-
-# @profile
-=======
-        return mat*const
->>>>>>> feature-meshReader

@@ -3,11 +3,11 @@ import numpy as np
 import scipy.sparse as sp
 import sys
 import logging
-from gmshtools import readGmshFile , writeGmshOut
 from scipy.sparse.linalg import spsolve
-from elements import Node2D , Constructor , FemProblem
+from elements import Node2D , FemProblem
 from datetime import datetime
 from python_to_xml import writeXML
+from gmsh_api import getMeshInfo
 
 def storeValuesToNodes(nodeArray,values):
         '''
@@ -36,24 +36,24 @@ def removeDuplicates(tupledNodes):
 
 t1 = datetime.now()
 logging.basicConfig(level='INFO')
+coordinates , conectivity = getMeshInfo()
 
 fileGmsh = sys.argv[1]
-nNodos, coord = Constructor('$Nodes',fileGmsh,None)
-nNodesBc , bcTupledNodes = Constructor('$Elements',fileGmsh,coord,bc=True)
-bcNodes = removeDuplicates(bcTupledNodes)
-nElem, conect = Constructor('$Elements',fileGmsh,coord)
+
+#FIXME : Hacer la parte que lea las physical groups
+#nNodesBc , bcTupledNodes
+#bcNodes = removeDuplicates(bcTupledNodes)
+
+nNodos = coordinates.shape[0]
+nElem = conectivity.shape[0]
 
 t2 = datetime.now()
 logging.info('Leer de Gmsh: %f sec', (t2 - t1).total_seconds())
 
-if len(conect[0].nloc) == 9:
-        elemType = 'Quad9'
-        elemNodes = 9
-else:
-        elemType = 'Quad4'
-        elemNodes = 4
+elemType = 'Quad4'
+elemNodes = 4
 
-fem = FemProblem(nElem,nNodos,elemType,conect,bcNodes)
+fem = FemProblem(nElem,nNodos,elemType,conectivity,bcNodes)
 
 t3 = datetime.now()
 logging.info('Crear elemento fem: %f sec', (t3 - t2).total_seconds())
@@ -64,7 +64,7 @@ t4 = datetime.now()
 logging.info('Seteo inicial de matrices: %f sec', (t4 - t3).total_seconds())
 
 #Seteo de condiciones de borde sobre los nodos
-fem.setBoundaryConditions(coord)
+fem.setBoundaryConditions(coordinates)
 
 t5 = datetime.now()
 logging.info('Seteo de BC en nodos: %f sec', (t5 - t4).total_seconds())
@@ -79,20 +79,18 @@ U = spsolve(fem.K,fem.brhs)
 t7 = datetime.now()
 logging.info('Calculo de desplazamientos: %f sec', (t7 - t6).total_seconds())
 
-storeValuesToNodes(coord,U)
-nodeCoordinates , nodeStress = createNodeData(coord)
+storeValuesToNodes(coordinates,U)
+nodeCoordinates , nodeStress = createNodeData(coordinates)
 U = U.reshape((nNodos,2))
 
 
-conectivity_xml = np.zeros((len(conect),elemNodes))
+conectivity_xml = np.zeros((len(conectivity),elemNodes))
 
-for ind , local in enumerate(conect):
+for ind , local in enumerate(conectivity):
         conectivity_xml[ind] = local.localNodes()
 
 #Escribir archivo .vtu para ver en Paraview
 #writeXML(nodeCoordinates, conectivity_xml , U, sys.argv[1], nodeStress)
-
-writeGmshOut(fileGmsh,U)
 
 t8 = datetime.now()
 logging.info('Tiempo total: %f sec', (t8 - t1).total_seconds())

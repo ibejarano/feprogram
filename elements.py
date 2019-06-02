@@ -1,65 +1,6 @@
 #!/usr/bin/python3.6
 import scipy.sparse as sp
-from gmshtools import readGmshFile
 import numpy as np
-
-def Constructor(entity,inpGmsh,cNodes,bc=False):
-    '''
-    entity: Entidad para extraer datos de malla, puede ser $Nodes o $Elements
-    inpGmsh: Input archivo .gmsh para extraer datos
-    cNodes: Lista con Nodos objetos
-    nEntity: Cantidad de entidades encontradas
-    entityList: Lista con entidades
-    '''
-    nEntity , entityFile = readGmshFile(entity,inpGmsh)
-    entityList = []
-    if entity == '$Nodes':
-        for items in range(nEntity):
-            line = entityFile.readline()  
-            intLine = tuple(map(float,line.split()))
-            entityList.append(Node2D(intLine[1:4]))
-    else:
-        line = entityFile.readline()  
-        intLine = tuple(map(int,line.split()))
-        counter = 0
-        if bc:
-            while (len(intLine) < 9):
-                nod = intLine[5:len(intLine)]
-                physGroup = intLine[3]
-                for intNode in nod:
-                    objNode = cNodes[intNode-1]
-                    objNode.setBG(physGroup)
-                line = entityFile.readline()
-                intLine = tuple(map(int,line.split()))
-                entityList.append(nod)
-                counter +=1
-            return nEntity , entityList
-        else:
-            if len(intLine) == 8:
-                entityList = readElements(entityFile,entityList,'Q9',cNodes)
-
-            else:
-                entityList = readElements(entityFile,entityList,'Q4',cNodes)
-            nEntity -=1
-    return nEntity  , entityList
-
-def readElements(fileGmsh,conectivity,elemType,coords):
-    '''
-    Once it identifies the elemType it gets here and iterate
-    '''
-    line = ' '
-    intLine = []
-    while (len(intLine) < 9):
-        line = fileGmsh.readline() 
-        intLine = tuple(map(int,line.split()))
-
-    while (line != '$EndElements\n'):
-        intLine = tuple(map(int,line.split()))
-        objNodes = nodesAsign(intLine[5:len(intLine)],coords)
-        conectivity.append(Elem(objNodes,elemType))
-        line = fileGmsh.readline() 
-
-    return conectivity
 
 def nodesAsign(tNodes,coordNodes):
     '''
@@ -126,7 +67,7 @@ class Elem:
             U[count , 0] = node.xValue
             U[count,1] = node.yValue
             count+=1
-        U = U.reshape((numNodos*2,1))
+        U.reshape((numNodos*2,1))
         return U
 
     def computeStress(self,C,Hrs):

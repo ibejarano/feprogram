@@ -4,3 +4,10 @@ __pycache__/
 Notebooks/
 *.sh
 *.msh
+bin/
+include/
+lib/
+share/
+Meshes/
+.directory
+demos/

@@ -1,90 +1,16 @@
 #!/usr/bin/python3.6
 import scipy.sparse as sp
-from gmshtools import readGmshFile
 import numpy as np
 import math
-
-def Constructor(entity,inpGmsh,cNodes,bc=False):
-    '''
-    entity: Entidad para extraer datos de malla, puede ser $Nodes o $Elements
-    inpGmsh: Input archivo .gmsh para extraer datos
-    cNodes: Lista con Nodos objetos
-    nEntity: Cantidad de entidades encontradas
-    entityList: Lista con entidades
-    '''
-    nEntity , entityFile = readGmshFile(entity,inpGmsh)
-    entityList = []
-    if entity == '$Nodes':
-        for items in range(nEntity):
-            line = entityFile.readline()  
-            intLine = tuple(map(float,line.split()))
-            entityList.append(Node2D(intLine[1:4]))
-    else:
-        line = entityFile.readline()  
-        intLine = tuple(map(int,line.split()))
-        counter = 0
-        if bc:
-            while (len(intLine) < 9):
-                nod = intLine[5:len(intLine)]
-                physGroup = intLine[3]
-                for intNode in nod:
-                    objNode = cNodes[intNode-1]
-                    objNode.setBG(physGroup)
-                line = entityFile.readline()
-                intLine = tuple(map(int,line.split()))
-                entityList.append(nod)
-                counter +=1
-            return nEntity , entityList
-        else:
-            if len(intLine) == 8:
-                entityList = readElements(entityFile,entityList,'Q9',cNodes)
-
-            else:
-                entityList = readElements(entityFile,entityList,'Q4',cNodes)
-            nEntity -=1
-    return nEntity  , entityList
-
-def readElements(fileGmsh,conectivity,elemType,coords):
-    '''
-    Once it identifies the elemType it gets here and iterate
-    '''
-    line = ' '
-    intLine = []
-    while (len(intLine) < 9):
-        line = fileGmsh.readline() 
-        intLine = tuple(map(int,line.split()))
-
-    while (line != '$EndElements\n'):
-        intLine = tuple(map(int,line.split()))
-        objNodes = nodesAsign(intLine[5:len(intLine)],coords)
-        conectivity.append(Elem(objNodes,elemType))
-        line = fileGmsh.readline() 
-
-    return conectivity
-
-def nodesAsign(tNodes,coordNodes):
-    '''
-    tNodes: Tupla con los nodos enteros
-    tobj: Tupla con los objetos nodos
-    '''
-    objNod = []
-    for i in tNodes:
-        objNod.append(coordNodes[i-1])
-    return objNod
 
 class Elem:
     def __init__(self,nodes,elemType):
         self.elemType = elemType
-        self.nloc = nodes
-
-    def localNodes(self):
-        initList = []
-        for i in range(len(self.nloc)):
-            initList.append(self.nloc[i].nglob)
-        return initList
+        self.nnodesloc = nodes
+        #self.nloc = nodes (This are ojects)
 
     def funB(self,dHrs,J):
-        dof = len(self.nloc)*2
+        dof = self.nnodesloc*2
         B = np.matrix(np.zeros((3,dof)))
         Jinv = np.linalg.inv(J)
         Dh = Jinv * dHrs
@@ -93,8 +19,9 @@ class Elem:
             B[2,i::2] = Dh[i-1]
         return B
 
-    def getpos(self):
+    def getpos(self, nodesTagList, coordinates):
         auxlist = []
+<<<<<<< HEAD
         nNodeslocal = len(self.nloc)
         for i in range(nNodeslocal):
             auxlist.append([self.nloc[i].x,self.nloc[i].y])
@@ -142,9 +69,14 @@ class Elem:
         for localNode in self.nloc:
             localNode.storeStress(stress)
         return 0
+=======
+        for node in nodesTagList:
+            auxlist.append([coordinates[node,0],coordinates[node,1]])
+        return np.matrix(auxlist)
+>>>>>>> feature-meshReader
 
 class FemProblem:
-    def __init__(self,nelem,nnode,elemType,conectivity,bcNodes):
+    def __init__(self,conectivity, coordinates):
         '''Instance the FEM problem, the code get around this class
         
         Arguments:
@@ -155,12 +87,13 @@ class FemProblem:
             conectivity {array} -- contains objects class Elem
             bcNodes {array} -- contains a list with nodes with boundary conditions
         '''
+        self.nnode = coordinates.shape[0]
+        self.nelem = len(conectivity)
 
-        self.nelem = nelem
-        self.nnode = nnode
-        self.elemType = elemType
+        self.elem = Elem(4,'Quad4') if len(conectivity[0])==4 else Elem(9,'Quad9')
+
         self.conectivity = conectivity
-        self.bcNodes = bcNodes
+        self.coordinates = coordinates
 
     def setMatrix(self):
         """[summary]
@@ -182,13 +115,13 @@ class FemProblem:
         self.K = sp.lil_matrix((nrows,ncols))
         self.brhs = sp.lil_matrix((nrows,1))
 
-        if self.elemType == 'Quad9':
+        if self.elem.elemType == 'Quad9':
             gpsList = [-0.774,0, 0.774]
             gpsWei = [0.55555 , 0.88888 , 0.55555]
             self.H = self.quadH(gpsList,self.funH9,gpsWei)
             self.Hrs = self.quadHrs(gpsList,self.funHrs9,gpsWei)
         
-        elif self.elemType == 'Quad4':
+        elif self.elem.elemType == 'Quad4':
             gpsList = [-0.5773,0.5773]
             gpsWei = [1,1]
             self.H = self.quadH(gpsList,self.funH4,gpsWei)
@@ -328,16 +261,31 @@ class FemProblem:
         dhrs[1] = hs
         return dhrs    
 
-    def getRowData(self,elem,Ke):
+    def getRowData(self,elemNodesTag,Ke):
         '''
         Optimized one
         '''
-        dof = len(elem.nloc)*2
-        listedNodes = [(x-1)*2+y for x in elem.localNodes() for y in [0,1]]
+        dof = len(elemNodesTag)*2
+        listedNodes = [(x-1)*2+y for x in elemNodesTag for y in [0,1]]
         col = listedNodes*dof
         row = [ind for ind in listedNodes for i in range(dof)]
         Kelem = Ke.ravel()
         return row , col , Kelem
+
+    def getKe(self, elemNodeTags):
+        dof = self.elem.nnodesloc*2
+        J = np.matrix(np.zeros((2,2)))
+        Ke = np.matrix(np.zeros((dof,dof)))
+        Be = np.matrix(np.zeros((3,dof)))
+        elemCorners = self.elem.getpos(elemNodeTags, self.coordinates)
+        for i in range(int(dof/2)):
+            J = self.Hrs[i] * elemCorners
+            detJ = np.linalg.det(J)
+            B = self.elem.funB(self.Hrs[i],J)
+            Ke += B.T * self.C * B * detJ*self.gpWei[i]*10
+            Be += B * detJ *10
+        self.Bstress = Be
+        return Ke
 
     def assemble(self):
         #Armado de matrices elementales y ensamblaje
@@ -347,7 +295,7 @@ class FemProblem:
         forceX = 1
         forceY = 0
         for elem in self.conectivity:
-            Ke = elem.getKe(self.H,self.Hrs,self.C,self.gpWei)
+            Ke = self.getKe(elem-1)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
             rowap , colap , Kelemap = self.getRowData(elem,Ke)
             row.extend(rowap)
@@ -361,7 +309,7 @@ class FemProblem:
         indexList = []
 
         for dirInd in self.nodesDIR:
-            i = (dirInd-1)*2
+            i = int((dirInd-1)*2)
             k = i+1
             _, J = self.K[i,:].nonzero()
             _, T = self.K[k,:].nonzero()
@@ -385,23 +333,29 @@ class FemProblem:
         self.K = self.K.tocsc()
         self.brhs = self.brhs.tocsc()
 
-    def setBoundaryConditions(self, coords):
+    def setBoundaryConditions(self, bcNodesList):
             '''
             it only receives a tuple with nodes and assign only forces and construct brhs from element
             '''
             #the first One is Dirichlet and its meant to be K = 1 in that index
             #if NEU brhs equals force
-            nodesDirichlet = []
-            nodesForce = []
-            for node in self.bcNodes:
-                if coords[node-1].bcGroup == 1:
-                    nodesDirichlet.append(node)
-                
-                else:
-                    nodesForce.append(node)
+            #bcNodeTags[0] = Borde inferior
+            #bcNodeTags[1] = Borde derecho
+            #bcNodeTags[2] = Borde superior
+            #bcNodeTags[3] = Borde izquierdo
 
-            self.nodesDIR = nodesDirichlet
-            self.nodesForce = nodesForce
+            dirichlet = [2,3]
+            neumann = [0,1]
+            dirNodes = set()
+            neuNodes = set()
+
+            for ind in dirichlet:
+                dirNodes.update(bcNodesList[ind])
+            for indNeu in neumann:
+                neuNodes.update(bcNodesList[indNeu] - dirNodes)
+
+            self.nodesDIR = list(dirNodes)
+            self.nodesForce = list(neuNodes)
 
     def Cmat(self):
         '''Calculates relation between stress-strains
@@ -419,6 +373,7 @@ class FemProblem:
             mat[ind] = i
             ind +=1
         const = E / (1- nu**2)
+<<<<<<< HEAD
         return mat*const
 
     def getStress(self):
@@ -458,3 +413,6 @@ class Node2D:
         self.markStress += 1
 
 # @profile
+=======
+        return mat*const
+>>>>>>> feature-meshReader

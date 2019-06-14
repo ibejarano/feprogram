@@ -11,7 +11,7 @@ class Elem:
 
     def funB(self,dHrs,J):
         dof = self.nnodesloc*2
-        B = np.matrix(np.zeros((3,dof)))
+        B = np.matrix(np.zeros((4,dof)))
         Jinv = np.linalg.inv(J)
         Dh = Jinv * dHrs
         for i in range(2):
@@ -63,6 +63,7 @@ class FemProblem:
         ncols = (self.nnode)*2
         nrows = (self.nnode)*2
         self.K = sp.lil_matrix((nrows,ncols))
+        self.M = sp.lil_matrix((nrows,ncols))
         self.brhs = sp.lil_matrix((nrows,1))
 
         if self.elem.elemType == 'Quad9':
@@ -211,7 +212,7 @@ class FemProblem:
         dhrs[1] = hs
         return dhrs    
 
-    def getRowData(self,elemNodesTag,Ke):
+    def getRowData(self,elemNodesTag):
         '''
         Optimized one
         '''
@@ -219,42 +220,53 @@ class FemProblem:
         listedNodes = [(x-1)*2+y for x in elemNodesTag for y in [0,1]]
         col = listedNodes*dof
         row = [ind for ind in listedNodes for i in range(dof)]
-        Kelem = Ke.ravel()
-        return row , col , Kelem
+        return row , col
 
     def getKe(self, elemNodeTags):
+        mu = 0.1
+        rho = 1
         dof = self.elem.nnodesloc*2
         J = np.matrix(np.zeros((2,2)))
         Ke = np.matrix(np.zeros((dof,dof)))
-        Be = np.matrix(np.zeros((3,dof)))
+        Me = np.matrix(np.zeros((dof,dof)))
+        m = np.matrix(np.array([1,1,0,1]).reshape((4,1)))
+        I = np.matrix(np.eye(4))
         elemCorners = self.elem.getpos(elemNodeTags, self.coordinates)
+        Hv = np.matrix(np.zeros((2,8)))
         for i in range(int(dof/2)):
             J = self.Hrs[i] * elemCorners
             detJ = np.linalg.det(J)
             B = self.elem.funB(self.Hrs[i],J)
-            Ke += B.T * self.C * B * detJ*self.gpWei[i]*10
-            Be += B * detJ *10
-        self.Bstress = Be
-        return Ke
+            Hv[0,::2] = self.H[i]
+            Hv[1,1::2] = self.H[i]
+            Ke += 2*mu* B.T * (I - 0.333 * m * m.T).T * (I - 0.333 * m * m.T) * B * detJ
+            Me += rho * Hv.T * Hv * detJ
+        return Ke, Me
 
     def assemble(self):
         #Armado de matrices elementales y ensamblaje
         row = []
         col = []
         Kelem = []
+        Melem = []
         forceX = 1
         forceY = 0
         for elem in self.conectivity:
-            Ke = self.getKe(elem-1)
+            Ke, Me = self.getKe(elem-1)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
-            rowap , colap , Kelemap = self.getRowData(elem,Ke)
+            rowap , colap = self.getRowData(elem)
+            Kelemap = Ke.ravel()
+            Melemap = Me.ravel()
             row.extend(rowap)
             col.extend(colap)
             Kelem.append(Kelemap)
+            Melem.append(Melemap)
 
         #Setup de matrices esparsas
         Kelem = np.array(Kelem).ravel()
+        Melem = np.array(Melem).ravel()
         self.K = sp.coo_matrix((Kelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
+        self.M = sp.coo_matrix((Melem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
 
         indexList = []
 

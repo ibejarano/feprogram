@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import numpy as np
-import scipy.sparse as sp
 import sys
 import logging
-from scipy.sparse.linalg import spsolve
 from elements import FemProblem
 from datetime import datetime
 from python_to_xml import writeXML , writeXML_nodeData
@@ -37,22 +35,14 @@ fem.assemble()
 t6 = datetime.now()
 logging.info('Ensamblaje de matrices: %f sec', (t6 - t5).total_seconds())
 
-U = spsolve(fem.K,fem.brhs)
+
+
+U = fem.solveProblem()
 
 t7 = datetime.now()
-logging.info('Calculo de desplazamientos: %f sec', (t7 - t6).total_seconds())
+logging.info('Calculo de velocidades: %f sec', (t7 - t6).total_seconds())
 
 U = U.reshape((coordinates.shape[0],2))
-
-
-#conectivity_xml = np.zeros((len(conectivity),elemNodes))
-
-#for ind , local in enumerate(conectivity):
-        #conectivity_xml[ind] = local.localNodes()
-
-#Escribir archivo .vtu para ver en Paraview
-#writeXML(nodeCoordinates, conectivity_xml , U, sys.argv[1], nodeStress)
-
 
 t8 = datetime.now()
 logging.info('Tiempo total: %f sec', (t8 - t1).total_seconds())

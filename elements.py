@@ -2,6 +2,8 @@
 import scipy.sparse as sp
 import numpy as np
 import math
+from scipy.sparse.linalg import spsolve
+
 
 class Elem:
     def __init__(self,nodes,elemType):
@@ -18,6 +20,15 @@ class Elem:
             B[i,i::2] = Dh[i]
             B[2,i::2] = Dh[i-1]
         return B
+
+    def getHgrad(self,dHrs, J):
+        dof = self.nnodesloc*2
+        H_grad = np.matrix(np.zeros((4,dof)))
+        Jinv = np.linalg.inv(J)
+        Dh = Jinv * dHrs
+        for i in range(2):
+            H_grad[i*2:i*2+2,i::2] = Dh
+        return H_grad
 
     def getpos(self, nodesTagList, coordinates):
         auxlist = []
@@ -59,11 +70,11 @@ class FemProblem:
             H[array] -- Array with form functions evaluated in gps
             Hrs[array] -- It haves the derivatives in gps
         """
-        self.C = self.Cmat()
         ncols = (self.nnode)*2
         nrows = (self.nnode)*2
         self.K = sp.lil_matrix((nrows,ncols))
         self.M = sp.lil_matrix((nrows,ncols))
+        self.Kp = sp.lil_matrix((nrows,ncols))
         self.brhs = sp.lil_matrix((nrows,1))
 
         if self.elem.elemType == 'Quad9':
@@ -223,12 +234,13 @@ class FemProblem:
         return row , col
 
     def getKe(self, elemNodeTags):
-        mu = 0.1
-        rho = 1
+        mu = 1e-2
+        rho = 1e3
         dof = self.elem.nnodesloc*2
         J = np.matrix(np.zeros((2,2)))
         Ke = np.matrix(np.zeros((dof,dof)))
         Me = np.matrix(np.zeros((dof,dof)))
+        Kpe = np.matrix(np.zeros((dof,dof)))
         m = np.matrix(np.array([1,1,0,1]).reshape((4,1)))
         I = np.matrix(np.eye(4))
         elemCorners = self.elem.getpos(elemNodeTags, self.coordinates)
@@ -241,7 +253,8 @@ class FemProblem:
             Hv[1,1::2] = self.H[i]
             Ke += 2*mu* B.T * (I - 0.333 * m * m.T).T * (I - 0.333 * m * m.T) * B * detJ
             Me += rho * Hv.T * Hv * detJ
-        return Ke, Me
+            Kpe += B.T * m * m.T * B * detJ
+        return Ke, Me, Kpe
 
     def assemble(self):
         #Armado de matrices elementales y ensamblaje
@@ -249,50 +262,48 @@ class FemProblem:
         col = []
         Kelem = []
         Melem = []
-        forceX = 1
-        forceY = 0
+        Kpelem = []
+        deltaP = 1e-9
+
         for elem in self.conectivity:
-            Ke, Me = self.getKe(elem-1)
+            Ke, Me , Kpe = self.getKe(elem-1)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
             rowap , colap = self.getRowData(elem)
             Kelemap = Ke.ravel()
             Melemap = Me.ravel()
+            Kpelemap = Kpe.ravel()
             row.extend(rowap)
             col.extend(colap)
             Kelem.append(Kelemap)
             Melem.append(Melemap)
+            Kpelem.append(Kpelemap)
 
         #Setup de matrices esparsas
         Kelem = np.array(Kelem).ravel()
         Melem = np.array(Melem).ravel()
+        Kpelem = np.array(Kpelem).ravel()
+
         self.K = sp.coo_matrix((Kelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
         self.M = sp.coo_matrix((Melem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
+        self.Kp = sp.coo_matrix((Kpelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
 
-        indexList = []
-
-        for dirInd in self.nodesDIR:
-            i = int((dirInd-1)*2)
-            k = i+1
-            _, J = self.K[i,:].nonzero()
-            _, T = self.K[k,:].nonzero()
+        for dof2Set in self.dofDir:
+            dof2Set = int(dof2Set)
+            _, J = self.K[dof2Set,:].nonzero()
             for j in J:
-                if j != i:
-                    indexList.append(j)
-                    self.K[i,j] = 0.0
-            for t in T:
-                if t != k:
-                    self.K[k,t] = 0.0
+                if j != dof2Set:
+                    self.K[dof2Set,j] = 0.0
             
-            self.K[i,i] = 1.0
-            self.K[k,k] = 1.0
+            self.K[dof2Set,dof2Set] = 1.0
+            self.brhs[dof2Set] = 0
 
-        for nodeForce in self.nodesForce:
-            glx = (nodeForce - 1)*2
-            gly = glx+1
-            self.brhs[glx] = forceX
-            self.brhs[gly] = forceY
+        for dofNeu in self.dofNeu:
+            self.brhs[dofNeu] = deltaP
 
         self.K = self.K.tocsc()
+        self.M = self.M.tocsc()
+        penalizacion = 1e2
+        self.Kp = (self.Kp * penalizacion).tocsc()
         self.brhs = self.brhs.tocsc()
 
     def setBoundaryConditions(self, bcNodesList):
@@ -301,38 +312,84 @@ class FemProblem:
             '''
             #the first One is Dirichlet and its meant to be K = 1 in that index
             #if NEU brhs equals force
-            #bcNodeTags[0] = Borde inferior
-            #bcNodeTags[1] = Borde derecho
-            #bcNodeTags[2] = Borde superior
-            #bcNodeTags[3] = Borde izquierdo
+            #bcNodeTags[0,1] = Borde inferior x y
+            #bcNodeTags[2,3] = Borde derecho  x y
+            #bcNodeTags[4,5] = Borde superior x y
+            #bcNodeTags[6,7] = Borde izquierdo x y
 
-            dirichlet = [2,3]
-            neumann = [0,1]
-            dirNodes = set()
-            neuNodes = set()
+            dofSetDir = [[0,1],[1],[1],[1]]
+            dirDof = set()
+            neuDof = set()
 
-            for ind in dirichlet:
-                dirNodes.update(bcNodesList[ind])
-            for indNeu in neumann:
-                neuNodes.update(bcNodesList[indNeu] - dirNodes)
+            for enu, nodes in enumerate(bcNodesList):
+                dof = [(node-1)*2 +j for node in nodes for j in range(2)]
+                for k in dofSetDir[enu]:
+                    dirDof.update(dof[k::2])
+                    if enu == 3:
+                        neuDof.update(set(dof) - set(dof[k::2]))
 
-            self.nodesDIR = list(dirNodes)
-            self.nodesForce = list(neuNodes)
+            self.dofDir = list(dirDof)
+            self.dofNeu = list(neuDof)
 
-    def Cmat(self):
-        '''Calculates relation between stress-strains
-        
-        Returns:
-            C (array) -- matrix with relation
-        '''
+    def getLocalVec(self, ind, Vec):
+        """Dados unos indices, devuelve un vector con esos grados de libertad"""
+        return Vec[ind].reshape((2,4))
 
-        nu = 0.3
-        E = 200
-        mat = np.zeros((3,3))
-        auxlist = [[1,nu,0],[nu,1,0],[0,0,(1-nu)*0.5]]
-        ind = 0
-        for i in auxlist:
-            mat[ind] = i
-            ind +=1
-        const = E / (1- nu**2)
-        return mat*const
+    def getNe(self, elemNodeTags, velocity):
+        rho = 1e3
+        dof = self.elem.nnodesloc*2
+        J = np.matrix(np.zeros((2,2)))
+        Ne = np.matrix(np.zeros((dof,dof)))
+        elemCorners = self.elem.getpos(elemNodeTags, self.coordinates)
+        Hv = np.matrix(np.zeros((2,8)))
+        dofLocal= [ int(i*2+j) for i in elemNodeTags for j in range(2)]
+        velLocal = self.getLocalVec(dofLocal, velocity)
+        for i in range(int(dof/2)):
+            J = self.Hrs[i] * elemCorners
+            detJ = np.linalg.det(J)
+            Hv[0,::2] = self.H[i]
+            Hv[1,1::2] = self.H[i]
+            H_grad = self.elem.getHgrad(self.Hrs[i],J)
+            Ne += Hv.T * rho * velLocal * H_grad * detJ
+        return Ne
+
+    def assemble_N(self, velGlobal):
+        #Armado de matrices elementales y ensamblaje
+        row = []
+        col = []
+        Nelem = []
+
+        for elem in self.conectivity:
+            Ne = self.getNe(elem-1, velGlobal)
+            #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
+            rowap , colap = self.getRowData(elem)
+            Nelemap = Ne.ravel()
+            row.extend(rowap)
+            col.extend(colap)
+            Nelem.append(Nelemap)
+
+        #Setup de matrices esparsas
+        Nelem = np.array(Nelem).ravel()
+
+        return sp.coo_matrix((Nelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tocsc()
+
+    def initialVector(self):
+        return np.ones(self.nnode*2)
+
+    def solveProblem(self):
+        V_prev = self.initialVector()
+        N = self.assemble_N(V_prev)
+        tol = 1e-11
+        for ite in range(50):
+            V = spsolve(self.K + N , self.brhs)
+            err = np.linalg.norm(V - V_prev , np.inf)
+            if err < tol:
+                print("INFO: Problem Converged!")
+                break
+            else:
+                print("INFO: error : {}".format(err))
+                print("INFO: Iterating number: {}".format(ite))
+            V_prev = V
+            N = self.assemble_N(V_prev)
+
+        return V

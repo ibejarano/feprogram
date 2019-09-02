@@ -33,11 +33,11 @@ def getMeshInfo():
     # - the next (optional) argument is the target mesh size close to the point
     #
     # - the last (optional) argument is the point tag
-    lc = 1e-1
+    lc = 1
     gmsh.model.geo.addPoint(0, 0, 0, lc, 1)
-    gmsh.model.geo.addPoint(.1, 0,  0, lc, 2)
-    gmsh.model.geo.addPoint(.1, .3, 0, lc, 3)
-    gmsh.model.geo.addPoint(0, .3, 0, lc, 4)
+    gmsh.model.geo.addPoint(2, 0,  0, lc, 2)
+    gmsh.model.geo.addPoint(2, 10, 0, lc, 3)
+    gmsh.model.geo.addPoint(0, 10, 0, lc, 4)
 
     # The API to create lines with the built-in kernel follows the same
     # conventions: the first 2 arguments are point tags, the last (optional one)

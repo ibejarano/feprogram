@@ -93,7 +93,7 @@ def writeXML_nodeData(coords, conect, nodedata, nameFile):
     #     fOut.write(' {} {} {}\n'.format(data[0],data[1],data[2]))
     # fOut.write('\n    </DataArray>')
     # #ESCRIBO LOS DATOS DE LOS NODOS DISPLACEMENTS
-    fOut.write('    <DataArray Name="Displacement" NumberOfComponents="2" type="Float32" format="ascii">\n    ')
+    fOut.write('    <DataArray Name="Velocidad" NumberOfComponents="2" type="Float32" format="ascii">\n    ')
     for data in nodedata:
         fOut.write(' {} {}\n'.format(data[0],data[1]))
     fOut.write('\n    </DataArray>')

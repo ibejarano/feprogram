@@ -73,8 +73,6 @@ class FemProblem:
         ncols = (self.nnode)*2
         nrows = (self.nnode)*2
         self.K = sp.lil_matrix((nrows,ncols))
-        self.M = sp.lil_matrix((nrows,ncols))
-        self.Kp = sp.lil_matrix((nrows,ncols))
         self.brhs = sp.lil_matrix((nrows,1))
 
         if self.elem.elemType == 'Quad9':
@@ -234,58 +232,36 @@ class FemProblem:
         return row , col
 
     def getKe(self, elemNodeTags):
-        mu = 1e-2
-        rho = 1e3
         dof = self.elem.nnodesloc*2
         J = np.matrix(np.zeros((2,2)))
         Ke = np.matrix(np.zeros((dof,dof)))
-        Me = np.matrix(np.zeros((dof,dof)))
-        Kpe = np.matrix(np.zeros((dof,dof)))
-        m = np.matrix(np.array([1,1,0,1]).reshape((4,1)))
-        I = np.matrix(np.eye(4))
         elemCorners = self.elem.getpos(elemNodeTags, self.coordinates)
-        Hv = np.matrix(np.zeros((2,8)))
         for i in range(int(dof/2)):
             J = self.Hrs[i] * elemCorners
             detJ = np.linalg.det(J)
             B = self.elem.funB(self.Hrs[i],J)
-            Hv[0,::2] = self.H[i]
-            Hv[1,1::2] = self.H[i]
-            Ke += 2*mu* B.T * (I - 0.333 * m * m.T).T * (I - 0.333 * m * m.T) * B * detJ
-            Me += rho * Hv.T * Hv * detJ
-            Kpe += B.T * m * m.T * B * detJ
-        return Ke, Me, Kpe
+            Ke += B.T * B * detJ
+        return Ke
 
     def assemble(self):
         #Armado de matrices elementales y ensamblaje
         row = []
         col = []
         Kelem = []
-        Melem = []
-        Kpelem = []
-        deltaP = 1e-9
 
         for elem in self.conectivity:
-            Ke, Me , Kpe = self.getKe(elem-1)
+            Ke = self.getKe(elem-1)
             #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
             rowap , colap = self.getRowData(elem)
             Kelemap = Ke.ravel()
-            Melemap = Me.ravel()
-            Kpelemap = Kpe.ravel()
             row.extend(rowap)
             col.extend(colap)
             Kelem.append(Kelemap)
-            Melem.append(Melemap)
-            Kpelem.append(Kpelemap)
 
         #Setup de matrices esparsas
         Kelem = np.array(Kelem).ravel()
-        Melem = np.array(Melem).ravel()
-        Kpelem = np.array(Kpelem).ravel()
 
         self.K = sp.coo_matrix((Kelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
-        self.M = sp.coo_matrix((Melem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
-        self.Kp = sp.coo_matrix((Kpelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tolil()
 
         for dof2Set in self.dofDir:
             dof2Set = int(dof2Set)
@@ -298,12 +274,9 @@ class FemProblem:
             self.brhs[dof2Set] = 0
 
         for dofNeu in self.dofNeu:
-            self.brhs[dofNeu] = deltaP
+            self.brhs[dofNeu] = 1 #FIXME : Hardcoded force value
 
         self.K = self.K.tocsc()
-        self.M = self.M.tocsc()
-        penalizacion = 1e2
-        self.Kp = (self.Kp * penalizacion).tocsc()
         self.brhs = self.brhs.tocsc()
 
     def setBoundaryConditions(self, bcNodesList):
@@ -335,50 +308,15 @@ class FemProblem:
         """Dados unos indices, devuelve un vector con esos grados de libertad"""
         return Vec[ind].reshape((2,4))
 
-    def getNe(self, elemNodeTags, velocity):
-        rho = 1e3
-        dof = self.elem.nnodesloc*2
-        J = np.matrix(np.zeros((2,2)))
-        Ne = np.matrix(np.zeros((dof,dof)))
-        elemCorners = self.elem.getpos(elemNodeTags, self.coordinates)
-        Hv = np.matrix(np.zeros((2,8)))
-        dofLocal= [ int(i*2+j) for i in elemNodeTags for j in range(2)]
-        velLocal = self.getLocalVec(dofLocal, velocity)
-        for i in range(int(dof/2)):
-            J = self.Hrs[i] * elemCorners
-            detJ = np.linalg.det(J)
-            Hv[0,::2] = self.H[i]
-            Hv[1,1::2] = self.H[i]
-            H_grad = self.elem.getHgrad(self.Hrs[i],J)
-            Ne += Hv.T * rho * velLocal * H_grad * detJ
-        return Ne
-
-    def assemble_N(self, velGlobal):
-        #Armado de matrices elementales y ensamblaje
-        row = []
-        col = []
-        Nelem = []
-
-        for elem in self.conectivity:
-            Ne = self.getNe(elem-1, velGlobal)
-            #self.K , self.brhs = Assemble(elem, Ke , self.K , self.brhs)
-            rowap , colap = self.getRowData(elem)
-            Nelemap = Ne.ravel()
-            row.extend(rowap)
-            col.extend(colap)
-            Nelem.append(Nelemap)
-
-        #Setup de matrices esparsas
-        Nelem = np.array(Nelem).ravel()
-
-        return sp.coo_matrix((Nelem,(row,col)),shape=(self.nnode*2,self.nnode*2)).tocsc()
-
     def initialVector(self):
         return np.ones(self.nnode*2)
 
+    def assembleMatrix(self, vec):
+        return 0
+
     def solveProblem(self):
         V_prev = self.initialVector()
-        N = self.assemble_N(V_prev)
+        N = self.assembleMatrix(V_prev)
         tol = 1e-11
         for ite in range(50):
             V = spsolve(self.K + N , self.brhs)
@@ -390,6 +328,6 @@ class FemProblem:
                 print("INFO: error : {}".format(err))
                 print("INFO: Iterating number: {}".format(ite))
             V_prev = V
-            N = self.assemble_N(V_prev)
+            N = self.assembleMatrix(V_prev)
 
         return V

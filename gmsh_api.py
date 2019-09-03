@@ -33,7 +33,7 @@ def getMeshInfo():
     # - the next (optional) argument is the target mesh size close to the point
     #
     # - the last (optional) argument is the point tag
-    lc = 1
+    lc = 0.25
     gmsh.model.geo.addPoint(0, 0, 0, lc, 1)
     gmsh.model.geo.addPoint(2, 0,  0, lc, 2)
     gmsh.model.geo.addPoint(2, 10, 0, lc, 3)

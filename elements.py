@@ -193,6 +193,7 @@ class FemProblem:
             self.brhs[dof2Set] = 0
 
         for dofNeu in self.dofNeu:
+            
             self.brhs[dofNeu] = 1 #FIXME : Hardcoded force value
 
         self.K = self.K.tocsc()
@@ -209,17 +210,21 @@ class FemProblem:
             #bcNodeTags[4,5] = Borde superior x y
             #bcNodeTags[6,7] = Borde izquierdo x y
 
-            dofSetDir = [[0,1],[1],[1],[1]]
+            dofSetDir = [[0,1],[],[],[]]
+            dofSetNeu = [[],[],[],[0,1]]
             dirDof = set()
             neuDof = set()
 
             for enu, nodes in enumerate(bcNodesList):
-                dof = [(node-1)*2 +j for node in nodes for j in range(2)]
+                dof = [int((node-1)*2 +j) for node in nodes for j in range(2)]
                 for k in dofSetDir[enu]:
                     dirDof.update(dof[k::2])
-                    if enu == 3:
-                        neuDof.update(set(dof) - set(dof[k::2]))
 
+                for m in dofSetNeu[enu]:
+                    neuDof.update(dof[m::2])
+
+            print(dirDof)
+            print(neuDof)
             self.dofDir = list(dirDof)
             self.dofNeu = list(neuDof)
 
@@ -234,19 +239,5 @@ class FemProblem:
         return 0
 
     def solveProblem(self):
-        V_prev = self.initialVector()
-        N = self.assembleMatrix(V_prev)
-        tol = 1e-11
-        for ite in range(50):
-            V = spsolve(self.K + N , self.brhs)
-            err = np.linalg.norm(V - V_prev , np.inf)
-            if err < tol:
-                print("INFO: Problem Converged!")
-                break
-            else:
-                print("INFO: error : {}".format(err))
-                print("INFO: Iterating number: {}".format(ite))
-            V_prev = V
-            N = self.assembleMatrix(V_prev)
-
+        V = spsolve(self.K , self.brhs)
         return V
